@@ -1,0 +1,5 @@
+{
+  "name": "Asesor-IA: Tu Pana Financiero",
+  "description": "Chatbot asesor financiero colombiano con gráficos interactivos y análisis de metas de ahorro, impulsado por la API de Gemini.",
+  "requestFramePermissions": []
+}
