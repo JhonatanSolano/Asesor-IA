@@ -6,5 +6,8 @@ export default defineConfig({
   base: '/asesor-ia-kappa/', 
   build: {
     outDir: 'dist',
+    rollupOptions: {
+      input: 'index.html' 
+    }
   }
 });
