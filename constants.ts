@@ -1,5 +1,3 @@
-import { Type } from "@google/genai";
-
 export const SYSTEM_PROMPT = `
 Eres "Asesor-IA: Tu Pana Financiero", un chatbot asesor financiero con una personalidad colombiana muy amigable, motivadora y un poco informal. Usas slang ligero como "parce", "chévere", "bacano", "qué más pues", "listo", y emojis como 💰, 🚀, 😎, 👍, 🐷. Tu objetivo es ayudar a los usuarios a organizar sus finanzas y establecer metas de ahorro realistas. NUNCA das consejos de inversión en acciones, criptomonedas u otros instrumentos de alto riesgo.
 
@@ -44,33 +42,33 @@ Sé siempre positivo y alentador, ¡incluso si la meta no es viable! Tu misión 
 `;
 
 export const GEMINI_RESPONSE_SCHEMA = {
-  type: Type.OBJECT,
+  type: 'OBJECT',
   properties: {
-    responseText: { type: Type.STRING, description: "La respuesta textual del chatbot para el usuario. Debe usar Markdown para tablas si es necesario." },
-    action: { type: Type.STRING, description: "Debe ser 'UPDATE_DATA' mientras se recolectan datos, o 'END' cuando se realiza el análisis final." },
+    responseText: { type: 'STRING', description: "La respuesta textual del chatbot para el usuario. Debe usar Markdown para tablas si es necesario." },
+    action: { type: 'STRING', description: "Debe ser 'UPDATE_DATA' mientras se recolectan datos, o 'END' cuando se realiza el análisis final." },
     updatedData: {
-      type: Type.OBJECT,
+      type: 'OBJECT',
       description: "Un objeto que contiene solo los datos financieros extraídos de la última respuesta del usuario.",
       properties: {
-        name: { type: Type.STRING, description: "Nombre del usuario." },
-        income: { type: Type.NUMBER, description: "Ingresos mensuales del usuario en COP." },
-        expenses: { type: Type.NUMBER, description: "Gastos mensuales del usuario en COP." },
-        goalName: { type: Type.STRING, description: "Nombre de la meta de ahorro." },
-        goalAmount: { type: Type.NUMBER, description: "Monto total de la meta de ahorro en COP." },
-        goalTimeline: { type: Type.STRING, description: "Plazo para la meta de ahorro (ej. '6 meses')." },
-        goalTimelineInMonths: {type: Type.NUMBER, description: "Plazo para la meta de ahorro en meses." }
+        name: { type: 'STRING', description: "Nombre del usuario." },
+        income: { type: 'NUMBER', description: "Ingresos mensuales del usuario en COP." },
+        expenses: { type: 'NUMBER', description: "Gastos mensuales del usuario en COP." },
+        goalName: { type: 'STRING', description: "Nombre de la meta de ahorro." },
+        goalAmount: { type: 'NUMBER', description: "Monto total de la meta de ahorro en COP." },
+        goalTimeline: { type: 'STRING', description: "Plazo para la meta de ahorro (ej. '6 meses')." },
+        goalTimelineInMonths: {type: 'NUMBER', description: "Plazo para la meta de ahorro en meses." }
       }
     },
     analysis: {
-      type: Type.OBJECT,
+      type: 'OBJECT',
       description: "Contiene el resultado del análisis financiero. Solo se incluye cuando la action es 'END'.",
       properties: {
-        isViable: { type: Type.BOOLEAN, description: "Si la meta de ahorro es viable con el ahorro mensual estimado." },
-        ahorroMensual: { type: Type.NUMBER, description: "El monto que el usuario puede ahorrar mensualmente (20% de ingresos menos gastos)." },
-        progresoPorcentaje: { type: Type.NUMBER, description: "El porcentaje del ahorro mensual necesario que se cumple con el ahorro mensual real." },
+        isViable: { type: 'BOOLEAN', description: "Si la meta de ahorro es viable con el ahorro mensual estimado." },
+        ahorroMensual: { type: 'NUMBER', description: "El monto que el usuario puede ahorrar mensualmente (20% de ingresos menos gastos)." },
+        progresoPorcentaje: { type: 'NUMBER', description: "El porcentaje del ahorro mensual necesario que se cumple con el ahorro mensual real." },
         sugerencias: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING },
+          type: 'ARRAY',
+          items: { type: 'STRING' },
           description: "Un array de 3 sugerencias para el usuario."
         }
       }
