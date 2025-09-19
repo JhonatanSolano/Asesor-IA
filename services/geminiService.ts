@@ -24,7 +24,7 @@ export const generateBotResponse = async (
     ];
 
     const response: GenerateContentResponse = await ai.models.generateContent({
-      model: "gemini-2.5-pro",
+      model: "gemini-2.5-flash",
       contents: fullHistory,
       config: {
         systemInstruction: SYSTEM_PROMPT,
