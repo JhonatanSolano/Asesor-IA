@@ -32,3 +32,9 @@ export interface GeminiResponse {
   updatedData?: UserData & SavingsGoal;
   analysis?: Analysis;
 }
+
+// New type to avoid client-side dependency on @google/genai
+export interface ChatHistoryContent {
+  role: 'user' | 'model';
+  parts: { text: string }[];
+}

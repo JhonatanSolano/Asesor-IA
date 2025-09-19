@@ -1,52 +1,36 @@
-import { GoogleGenAI, GenerateContentResponse, Content } from "@google/genai";
-import { GeminiResponse } from '../types';
-import { SYSTEM_PROMPT, GEMINI_RESPONSE_SCHEMA } from '../constants';
-
-// Fix: Directly check and use process.env.API_KEY as per guidelines.
-if (!process.env.API_KEY) {
-  throw new Error("API_KEY environment variable not set");
-}
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+import { GeminiResponse, ChatHistoryContent } from '../types';
 
 export const generateBotResponse = async (
-  history: Content[],
+  history: ChatHistoryContent[],
   currentUserInput: string,
   currentData: object
 ): Promise<GeminiResponse | null> => {
   try {
-    const fullHistory: Content[] = [
-      ...history,
-      {
-        role: 'user',
-        parts: [{ text: `Esta es mi respuesta: "${currentUserInput}". Mis datos actuales son: ${JSON.stringify(currentData)}` }]
-      }
-    ];
-
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: fullHistory,
-      config: {
-        systemInstruction: SYSTEM_PROMPT,
-        responseMimeType: "application/json",
-        responseSchema: GEMINI_RESPONSE_SCHEMA,
-        temperature: 0.5,
+    const response = await fetch('/api/generate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({ history, currentUserInput, currentData }),
     });
-    
-    const jsonText = response.text.trim();
-    if (!jsonText) {
-        throw new Error("API returned an empty response.");
+
+    if (!response.ok) {
+      try {
+        const errorData = await response.json();
+        console.error("Error from backend:", errorData);
+        return errorData as GeminiResponse;
+      } catch {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
     }
 
-    const parsedResponse: GeminiResponse = JSON.parse(jsonText);
+    const parsedResponse: GeminiResponse = await response.json();
     return parsedResponse;
 
   } catch (error) {
-    console.error("Error generating bot response:", error);
-    // In case of a failure, return null or a default error structure
+    console.error("Error calling backend API:", error);
     return {
-      responseText: "¡Uy, parce! 😬 Parece que algo no está funcionando bien por acá. Dame un chance y vuelve a intentarlo más tarde, porfa.",
+      responseText: "¡Uy, parce! 😬 Parece que algo se rompió en la comunicación. Dame un chance y vuelve a intentarlo más tarde, porfa.",
       action: "UPDATE_DATA",
     };
   }

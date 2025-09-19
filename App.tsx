@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Message, UserData, SavingsGoal, Analysis, GeminiResponse } from './types';
+import { Message, UserData, SavingsGoal, Analysis, ChatHistoryContent } from './types';
 import { generateBotResponse } from './services/geminiService';
 import ChatMessage from './components/ChatMessage';
 import UserInput from './components/UserInput';
@@ -43,7 +43,7 @@ const App: React.FC = () => {
     setAnalysis(null);
 
     try {
-      const history = messages.map(msg => ({
+      const history: ChatHistoryContent[] = messages.map(msg => ({
         role: msg.sender === 'bot' ? 'model' : 'user',
         parts: [{ text: msg.text }]
       }));
