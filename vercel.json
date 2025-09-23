@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/node",
+      "config": { "includeFiles": ["api/**"] }
+    },
+    {
+      "src": "index.html",
+      "use": "@vercel/static",
+      "config": { "distDir": "dist" }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ],
+  "installCommand": "npm install --include=dev" // Fuerza la instalación de devDependencies
+}
