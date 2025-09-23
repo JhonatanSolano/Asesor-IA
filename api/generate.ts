@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, GenerateContentResponse, Content } from "@google/genai";
+import { GoogleGenerativeAI, GenerateContentResponse, Content } from "@google/generative-ai";
 import { SYSTEM_PROMPT, GEMINI_RESPONSE_SCHEMA } from '../constants';
 
 export default async function handler(req: any, res: any) {
