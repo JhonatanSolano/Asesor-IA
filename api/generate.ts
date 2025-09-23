@@ -7,7 +7,7 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
   
-  if (!process.env.API_KEY) {
+  if (!process.env.VITE_GEMINI_API_KEY) {
     console.error("API_KEY not found in environment variables.");
     return res.status(500).json({ error: "Server configuration error: API_KEY is missing." });
   }
