@@ -1,0 +1,5 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', 'gcr.io/[YOUR_PROJECT_ID]/asesor-ia', '.']
+images:
+- 'gcr.io/plexiform-plane-473017-n2/asesor-ia'
