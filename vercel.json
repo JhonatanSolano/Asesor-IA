@@ -18,5 +18,5 @@
       "dest": "/index.html"
     }
   ],
-  "installCommand": "npm install --include=dev" // Fuerza la instalación de devDependencies
+  "installCommand": "npm install --include=dev" 
 }
