@@ -12,7 +12,7 @@ export default async function handler(req: any, res: any) {
     return res.status(500).json({ error: "Server configuration error: API_KEY is missing." });
   }
 
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: process.env.VITE_GEMINI_API_KEY });
 
   try {
     const { history, currentUserInput, currentData } = req.body;
