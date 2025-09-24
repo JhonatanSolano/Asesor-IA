@@ -90,7 +90,7 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ error: "Method Not Allowed" });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+  const apiKey = process.env.API_KEY;
   if (!apiKey) {
     console.error("GEMINI_API_KEY / API_KEY missing");
     return res.status(500).json({ error: "Server configuration error: GEMINI_API_KEY is missing." });
