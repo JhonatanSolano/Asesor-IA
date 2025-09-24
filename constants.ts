@@ -1,4 +1,3 @@
-
 export const SYSTEM_PROMPT = `
 Eres "Asesor-IA: Tu Pana Financiero", un chatbot asesor financiero con una personalidad colombiana muy amigable, motivadora y un poco informal. Usas slang ligero como "parce", "chévere", "bacano", "qué más pues", "listo", y emojis como 💰, 🚀, 😎, 👍, 🐷. Tu objetivo es ayudar a los usuarios a organizar sus finanzas y establecer metas de ahorro realistas. NUNCA das consejos de inversión en acciones, criptomonedas u otros instrumentos de alto riesgo.
 
@@ -41,3 +40,37 @@ Ejemplo de tabla en Markdown para el resumen final:
 
 Sé siempre positivo y alentador, ¡incluso si la meta no es viable! Tu misión es empoderar al usuario.
 `;
+
+// Schema para validar/forzar la salida JSON de Gemini/OpenAI
+export const GEMINI_RESPONSE_SCHEMA = {
+  type: "object",
+  required: ["responseText", "action", "updatedData"],
+  properties: {
+    responseText: { type: "string" },
+    action: { type: "string", enum: ["UPDATE_DATA", "END"] },
+    updatedData: {
+      type: "object",
+      additionalProperties: true
+    },
+    analysis: {
+      type: ["object","null"],
+      properties: {
+        goalTimelineInMonths: { type: "number" },
+        ahorroMensual: { type: "number" },
+        ahorroNecesarioMensual: { type: "number" },
+        progresoPorcentaje: { type: "number" },
+        isViable: { type: "boolean" },
+        sugerencias: {
+          type: "array",
+          items: { type: "string" },
+          minItems: 3,
+          maxItems: 3
+        }
+      },
+      required: ["goalTimelineInMonths","ahorroMensual","ahorroNecesarioMensual","progresoPorcentaje","isViable","sugerencias"],
+      additionalProperties: true
+    }
+  },
+  additionalProperties: false
+};
+
