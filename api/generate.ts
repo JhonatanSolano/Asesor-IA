@@ -76,12 +76,7 @@ Modos según currentData.mode:
    Produce una ruta breve y accionable: temas, orden de estudio, práctica sugerida y mini-meta diaria.
    Si incluyes ejemplos de temas o ejercicios, usa LaTeX para las expresiones matemáticas.
 
-Siempre responde con JSON puro, sin markdown fences.
-El JSON debe tener exactamente:
-{
-  "responseText": "respuesta en Markdown",
-  "action": "RESPOND"
-}
+Responde directamente en Markdown. No respondas JSON. No uses markdown fences salvo que el estudiante pida código.
 `;
 
 function normalizeLatex(text: string): string {
@@ -115,12 +110,6 @@ function sendJson(res: ApiResponse, statusCode: number, body: unknown) {
   return res.end?.(JSON.stringify(body));
 }
 
-function extractJson(text: string): string {
-  const trimmed = text.trim();
-  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
-  return fenced ? fenced[1].trim() : trimmed;
-}
-
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -133,7 +122,7 @@ async function generateWithModel(
   apiKey: string,
   modelName: string,
   contents: ChatContent[]
-): Promise<unknown> {
+): Promise<{ responseText: string; action: "RESPOND" }> {
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const response = await fetch(endpoint, {
     method: "POST",
@@ -145,9 +134,6 @@ async function generateWithModel(
         parts: [{ text: SYSTEM_PROMPT }],
       },
       contents,
-      generationConfig: {
-        responseMimeType: "application/json",
-      },
     }),
   });
 
@@ -162,7 +148,10 @@ async function generateWithModel(
     throw new Error("Gemini response did not include text content.");
   }
 
-  return JSON.parse(extractJson(modelText));
+  return {
+    responseText: normalizeLatex(modelText.trim()),
+    action: "RESPOND",
+  };
 }
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
@@ -187,7 +176,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const prompt = [
       `Datos actuales del usuario: ${JSON.stringify(currentData)}`,
       `Mensaje actual del usuario: ${currentUserInput}`,
-      "Responde unicamente con JSON valido siguiendo el formato indicado en el sistema.",
+      "Responde directamente al estudiante en Markdown claro y con LaTeX cuando corresponda.",
     ].join("\n\n");
 
     const contents: ChatContent[] = [
@@ -202,9 +191,6 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     for (const modelName of getModelCandidates()) {
       try {
         const parsed = await generateWithModel(apiKey, modelName, contents);
-        if (parsed && typeof parsed === "object" && "responseText" in parsed && typeof parsed.responseText === "string") {
-          parsed.responseText = normalizeLatex(parsed.responseText);
-        }
         return sendJson(res, 200, parsed);
       } catch (error) {
         lastError = error;
