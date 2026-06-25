@@ -33,6 +33,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, onQuickReply, quickR
                 p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
                 ol: ({node, ...props}) => <ol className="ml-5 list-decimal space-y-1" {...props} />,
                 ul: ({node, ...props}) => <ul className="ml-5 list-disc space-y-1" {...props} />,
+                code: ({node, ...props}) => <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-sm text-slate-900" {...props} />,
+                pre: ({node, ...props}) => <pre className="my-3 overflow-x-auto rounded-lg bg-slate-950 p-3 text-sm text-white" {...props} />,
             }}
          >
             {message.text}

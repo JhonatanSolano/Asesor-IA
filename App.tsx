@@ -55,11 +55,23 @@ const normalizeText = (input: string) =>
 const detectMode = (input: string): TutorMode | null => {
   const normalized = normalizeText(input);
 
-  if (/resolver|resuelve|solucionar|calcula|hallar|halla|factoriza|simplifica|pregunta|enunciado|cuanto es/.test(normalized)) return 'solve';
   if (/generar|crear ejercicios|ejercicios tipo|preguntas tipo|banco|examen/.test(normalized)) return 'generate';
+  if (/resolver|resuelve|solucionar|calcula|hallar|halla|factoriza|simplifica|pregunta|enunciado|cuanto es/.test(normalized)) return 'solve';
   if (/practicar|practica|tema|entrenar|repasar/.test(normalized)) return 'practice';
   if (/revisar|error|me equivoque|respuesta incorrecta|por que/.test(normalized)) return 'review';
   if (/plan|ruta|guia|clase|taller|quiz|evaluacion|material/.test(normalized)) return 'guide';
+
+  return null;
+};
+
+const getExplicitModeSelection = (input: string): TutorMode | null => {
+  const normalized = normalizeText(input);
+
+  if (normalized === 'resolver una pregunta' || normalized === 'resolver pregunta') return 'solve';
+  if (normalized === 'generar ejercicios tipo examen' || normalized === 'ejercicios tipo examen') return 'generate';
+  if (normalized === 'practicar por tema') return 'practice';
+  if (normalized === 'revisar mi error' || normalized === 'revisar error') return 'review';
+  if (normalized === 'crear plan de estudio' || normalized === 'plan de estudio') return 'guide';
 
   return null;
 };
@@ -130,11 +142,16 @@ const App: React.FC = () => {
     };
     setMessages(prev => [...prev, userMessage]);
 
-    const requestedMode = detectMode(userInput);
-    if (requestedMode) {
-      setActiveMode(requestedMode);
-      addBotMessage(modePrompts[requestedMode]);
+    const explicitMode = getExplicitModeSelection(userInput);
+    if (explicitMode) {
+      setActiveMode(explicitMode);
+      addBotMessage(modePrompts[explicitMode]);
       return;
+    }
+    const inferredMode = detectMode(userInput);
+    const modeForRequest = inferredMode || activeMode;
+    if (inferredMode && inferredMode !== activeMode) {
+      setActiveMode(inferredMode);
     }
 
     setIsLoading(true);
@@ -147,7 +164,7 @@ const App: React.FC = () => {
           parts: [{ text: msg.text }],
         }));
 
-      const response = await generateBotResponse(history, userInput, buildModeContext(activeMode));
+      const response = await generateBotResponse(history, userInput, buildModeContext(modeForRequest));
 
       if (!response) {
         throw new Error('Invalid response from API');
@@ -239,6 +256,10 @@ const App: React.FC = () => {
             ))}
           </div>
         </section>
+
+        <footer className="border-t border-slate-200 bg-white px-5 py-6 text-center text-sm font-medium text-slate-600">
+          Todos los derechos reservados - Jhonatan Solano - Matemático de la Universidad Nacional de Colombia.
+        </footer>
       </main>
 
       <button
