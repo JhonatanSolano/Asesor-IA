@@ -15,6 +15,10 @@ View your app in AI Studio: https://ai.studio/apps/drive/1HCG7YtE8FH62V93ttpdm2s
 
 1. Install dependencies:
    `npm install`
-2. Set the `API_KEY` in [.env.local](.env.local) to your API key
+2. Copy `.env.example` to `.env.local` and set `API_KEY` to a valid Gemini API key.
 3. Run the app:
    `npm run dev`
+
+The local Vite server includes the `/api/generate` endpoint used by the chat.
+For Vercel deployments, configure the same `API_KEY` environment variable in the
+project settings before deploying.

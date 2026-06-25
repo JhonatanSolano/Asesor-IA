@@ -20,7 +20,9 @@ export const generateBotResponse = async (
         // Intentar parsear el mensaje de error del backend para más contexto
         const errorData = await response.json();
         console.error("Error from backend:", errorData);
-        if (errorData.error) {
+        if (response.status === 503) {
+          errorMessage = "Estoy con mucho tráfico por un momento. Intenta enviar tu mensaje otra vez en unos segundos, porfa.";
+        } else if (errorData.error) {
           // Usar el mensaje de error específico de nuestra API
           errorMessage = `Error del Pana-Servidor: ${errorData.error}`;
         }

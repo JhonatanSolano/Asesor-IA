@@ -1,102 +1,143 @@
-import * as SDK from "@google/generative-ai"; // <- mantén esto si ese es el package que tienes
-import { SYSTEM_PROMPT, GEMINI_RESPONSE_SCHEMA } from "../constants";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { SYSTEM_PROMPT } from "../constants";
 
-type AnyClient = any;
+type ApiRequest = {
+  method?: string;
+  body?: {
+    history?: Array<{ role: "user" | "model"; parts: Array<{ text: string }> }>;
+    currentUserInput?: string;
+    currentData?: Record<string, unknown>;
+  };
+};
 
-function createClient(apiKey: string): AnyClient {
-  // Intenta detectar/instanciar el cliente según la forma que exporte la librería.
-  const exported = (SDK as any) || {};
+type ApiResponse = {
+  status: (code: number) => ApiResponse;
+  json: (body: unknown) => void;
+};
 
-  // Posibles nombres de clase/factory exportados
-  const Candidates = [
-    exported.GoogleGenerativeAI,
-    exported.GoogleGenAI,
-    exported.GoogleGenAIClient,
-    exported.GoogleGenAIClientV1,
-    exported.default,
-    exported // por si exporta la clase directamente
-  ];
+type ChatContent = {
+  role: "user" | "model";
+  parts: Array<{ text: string }>;
+};
 
-  for (const C of Candidates) {
-    if (!C) continue;
-    try {
-      // 1) intenta constructor con objeto { apiKey }
-      try {
-        const inst = new C({ apiKey });
-        if (inst) return inst;
-      } catch (e) {
-        // ignore
-      }
-
-      // 2) intenta constructor con string apiKey
-      try {
-        const inst = new C(apiKey);
-        if (inst) return inst;
-      } catch (e) {
-        // ignore
-      }
-
-      // 3) si C es ya una instancia o un cliente usable (no constructor)
-      if (typeof C === "object") return C;
-
-      // 4) si es función que provee methods (factory)
-      if (typeof C === "function") {
-        try {
-          const maybe = C({ apiKey });
-          if (maybe) return maybe;
-        } catch (e) {
-          // ignore
-        }
-      }
-    } catch (err) {
-      // sigue al siguiente candidato
-    }
-  }
-
-  // fallback: devuelve el SDK entero por si tiene métodos estáticos que podamos usar
-  return SDK as any;
+function getApiKey(): string | undefined {
+  return process.env.API_KEY || process.env.GEMINI_API_KEY;
 }
 
-async function generateWithClient(ai: AnyClient, payload: any) {
-  // intenta varias formas de invocar la generación
-  // 1) ai.models.generateContent(...)
-  if (ai?.models?.generateContent) {
-    return ai.models.generateContent(payload);
-  }
-
-  // 2) ai.generateContent(...)
-  if (ai?.generateContent) {
-    return ai.generateContent(payload);
-  }
-
-  // 3) ai.create?.(...) / ai.predict?.(...) / SDK.generate?.(...)
-  if (ai?.create) {
-    return ai.create(payload);
-  }
-  if (ai?.predict) {
-    return ai.predict(payload);
-  }
-
-  // 4) tal vez SDK (export) tiene un método standalone
-  if ((SDK as any)?.generateContent) {
-    return (SDK as any).generateContent(payload);
-  }
-
-  throw new Error("No se encontró un método válido para generar contenido en el SDK instalado.");
+function getModelName(): string {
+  return process.env.GEMINI_MODEL || "gemini-2.5-flash";
 }
 
-export default async function handler(req: any, res: any) {
+function getModelCandidates(): string[] {
+  return Array.from(new Set([getModelName(), "gemini-2.5-flash-lite", "gemini-flash-lite-latest"]));
+}
+
+function extractJson(text: string): string {
+  const trimmed = text.trim();
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  return fenced ? fenced[1].trim() : trimmed;
+}
+
+function isRetryableModelError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /high demand|Service Unavailable|Too Many Requests|quota|429|503/i.test(message);
+}
+
+async function generateWithModel(
+  apiKey: string,
+  modelName: string,
+  contents: ChatContent[]
+): Promise<unknown> {
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({
+    model: modelName,
+    systemInstruction: {
+      role: "system",
+      parts: [{ text: SYSTEM_PROMPT }],
+    },
+    generationConfig: {
+      responseMimeType: "application/json",
+    } as any,
+  });
+
+  const result = await model.generateContent({ contents });
+  const responseText = result.response.text();
+  return JSON.parse(extractJson(responseText));
+}
+
+export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method Not Allowed" });
   }
 
-  const apiKey = process.env.API_KEY;
+  const apiKey = getApiKey();
   if (!apiKey) {
-    console.error("GEMINI_API_KEY / API_KEY missing");
-    return res.status(500).json({ error: "Server configuration error: GEMINI_API_KEY is missing." });
+    console.error("Missing API_KEY or GEMINI_API_KEY environment variable.");
+    return res.status(500).json({
+      error: "Falta configurar la variable de entorno API_KEY o GEMINI_API_KEY en el servidor.",
+    });
   }
 
-  const ai = createClient(apiKey);
+  const { history = [], currentUserInput = "", currentData = {} } = req.body || {};
+  if (!currentUserInput.trim()) {
+    return res.status(400).json({ error: "El mensaje del usuario está vacío." });
+  }
 
   try {
-    const { h
+    const prompt = [
+      `Datos actuales del usuario: ${JSON.stringify(currentData)}`,
+      `Mensaje actual del usuario: ${currentUserInput}`,
+      "Responde únicamente con JSON válido siguiendo el formato indicado en el sistema.",
+    ].join("\n\n");
+
+    const contents: ChatContent[] = [
+      ...history,
+      {
+        role: "user",
+        parts: [{ text: prompt }],
+      },
+    ];
+
+    let lastError: unknown;
+    for (const modelName of getModelCandidates()) {
+      try {
+        const parsed = await generateWithModel(apiKey, modelName, contents);
+        return res.status(200).json(parsed);
+      } catch (error) {
+        lastError = error;
+        if (!isRetryableModelError(error)) {
+          throw error;
+        }
+
+        console.warn(`Gemini model "${modelName}" is temporarily unavailable. Trying fallback model.`);
+      }
+    }
+
+    throw lastError;
+  } catch (error) {
+    console.error("Error generating Gemini response:", error);
+    const message = error instanceof Error ? error.message : String(error);
+
+    if (/API key not valid|API_KEY_INVALID/i.test(message)) {
+      return res.status(401).json({
+        error: "La API key de Gemini no es válida. Genera una clave nueva y configúrala como API_KEY o GEMINI_API_KEY.",
+      });
+    }
+
+    if (/not found|not supported|ListModels/i.test(message)) {
+      return res.status(502).json({
+        error: `El modelo de Gemini "${getModelName()}" no está disponible. Configura GEMINI_MODEL con un modelo vigente, por ejemplo gemini-2.5-flash.`,
+      });
+    }
+
+    if (/high demand|Service Unavailable|Too Many Requests|quota|429|503/i.test(message)) {
+      return res.status(503).json({
+        error: "Gemini está saturado o sin cuota temporalmente. Intenta de nuevo en unos segundos.",
+      });
+    }
+
+    return res.status(500).json({
+      error: "No se pudo generar la respuesta con Gemini. Revisa la API key y los logs del servidor.",
+    });
+  }
+}

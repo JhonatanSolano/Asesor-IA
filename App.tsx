@@ -7,6 +7,18 @@ import UserInput from './components/UserInput';
 import SavingsChart from './components/SavingsChart';
 import Spinner from './components/Spinner';
 
+const isTechnicalMessage = (message: Message) => {
+  if (message.sender !== 'bot') return false;
+
+  return [
+    'Error del Pana-Servidor:',
+    '¡Uy, parce! El servidor respondió',
+    '¡Uy, parce! Algo falló',
+    '¡Uy, parce! 😬 Parece que algo',
+    'Estoy con mucho tráfico',
+  ].some(prefix => message.text.startsWith(prefix));
+};
+
 const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [userData, setUserData] = useState<UserData>({});
@@ -43,10 +55,12 @@ const App: React.FC = () => {
     setAnalysis(null);
 
     try {
-      const history: ChatHistoryContent[] = messages.map(msg => ({
-        role: msg.sender === 'bot' ? 'model' : 'user',
-        parts: [{ text: msg.text }]
-      }));
+      const history: ChatHistoryContent[] = messages
+        .filter(msg => !isTechnicalMessage(msg))
+        .map(msg => ({
+          role: msg.sender === 'bot' ? 'model' : 'user',
+          parts: [{ text: msg.text }]
+        }));
       
       const response = await generateBotResponse(history, userInput, { ...userData, ...savingsGoal });
       
