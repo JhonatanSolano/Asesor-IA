@@ -123,7 +123,9 @@ const parseNumberValue = (input: string) => {
 };
 
 const parseMoneyValueFromText = (input: string) => {
-  const normalized = normalizeText(input).replace(/(\d)(m\b|millones?|palos?)/g, '$1 $2');
+  const normalized = normalizeText(input)
+    .replace(/\b\d+(?:[.,]\d+)?\s*%/g, ' ')
+    .replace(/(\d)(m\b|millones?|palos?)/g, '$1 $2');
   const hasDigit = /\d/.test(normalized);
   const hasMoneyUnit = /\b(m|millon|millones|palos?|pesos?)\b/.test(normalized);
   if (!hasDigit && !hasMoneyUnit) return undefined;
@@ -179,6 +181,33 @@ const parseGoalAmount = (input: string) => {
     || parseMoneyValueFromText(input);
 };
 
+const parseMonthlyAvailableAmount = (input: string) => {
+  const normalized = normalizeText(input);
+  if (!/(restante|restantes|libre|libres|queda|quedan|sobran|disponible|puedo ahorrar)/.test(normalized)) {
+    return undefined;
+  }
+
+  return parseMoneyNearKeywords(input, ['restante', 'restantes', 'libre', 'libres', 'queda', 'quedan', 'sobran', 'disponible'])
+    || parseMoneyValueFromText(input);
+};
+
+const extractPlanDataFromInput = (input: string): Partial<UserData & SavingsGoal> => {
+  const income = parseMoneyNearKeywords(input, ['ingreso', 'ingresos', 'gano', 'gana', 'salario', 'mensualidad']);
+  const expenses = parseMoneyNearKeywords(input, ['gasto', 'gastos', 'egreso', 'arriendo', 'mercado']);
+  const goalAmount = parseGoalAmount(input);
+  const goalTimelineInMonths = parseTimelineInMonths(input);
+
+  return {
+    ...(income ? { income } : {}),
+    ...(expenses ? { expenses } : {}),
+    ...(goalAmount ? { goalAmount } : {}),
+    ...(goalTimelineInMonths ? {
+      goalTimelineInMonths,
+      goalTimeline: formatTimeline(goalTimelineInMonths),
+    } : {}),
+  };
+};
+
 type AdjustmentMode = 'extraIncome' | 'timeline' | 'expenses' | 'goalAmount';
 
 const getAdjustmentMenu = () =>
@@ -227,8 +256,9 @@ const applyPostAnalysisAdjustment = (
   const income = parseMoneyNearKeywords(input, ['ingreso', 'ingresos', 'gano', 'gana', 'salario', 'mensualidad']);
   const extraIncome = parseExtraIncomeAmount(input);
   const expenses = parseMoneyNearKeywords(input, ['gasto', 'gastos', 'egreso', 'arriendo', 'mercado']);
+  const monthlyAvailable = parseMonthlyAvailableAmount(input);
 
-  if (!goalTimelineInMonths && !goalAmount && !income && !extraIncome && !expenses) {
+  if (!goalTimelineInMonths && !goalAmount && !income && !extraIncome && !expenses && !monthlyAvailable) {
     return null;
   }
 
@@ -242,6 +272,10 @@ const applyPostAnalysisAdjustment = (
     ...(income ? { income: /extra|adicional|mas/.test(normalizeText(input)) && data.income ? data.income + income : income } : {}),
     ...(extraIncome && !income ? { income: (data.income || 0) + extraIncome } : {}),
     ...(expenses ? { expenses } : {}),
+    ...(monthlyAvailable ? {
+      monthlyAvailable,
+      ...(data.income ? { expenses: data.income - monthlyAvailable } : {}),
+    } : {}),
   };
 };
 
@@ -259,8 +293,8 @@ const hydratePlanData = (
   const income = Number(data.income) || undefined;
   const expenses = Number(data.expenses) || undefined;
   const explicitMonthlyAvailable = Number(data.monthlyAvailable) || undefined;
-  const monthlyAvailable = explicitMonthlyAvailable
-    || (income && !Number.isNaN(expenses) ? income - expenses : undefined)
+  const monthlyAvailable = (income && !Number.isNaN(expenses) ? income - expenses : undefined)
+    || explicitMonthlyAvailable
     || currentAnalysis?.monthlyAvailable
     || (currentAnalysis?.ahorroMensual ? currentAnalysis.ahorroMensual / 0.2 : undefined);
 
@@ -517,9 +551,13 @@ const App: React.FC = () => {
             return;
           }
 
-          const income = Number(basePlan.income) || undefined;
+          const previousExpenses = Number(basePlan.expenses) || undefined;
+          const previousMonthlyAvailable = Number(basePlan.monthlyAvailable) || undefined;
+          const income = Number(basePlan.income)
+            || (previousExpenses && previousMonthlyAvailable ? previousExpenses + previousMonthlyAvailable : undefined);
           completeAdjustedData = hydratePlanData({
             ...basePlan,
+            income,
             expenses,
             monthlyAvailable: income ? income - expenses : basePlan.monthlyAvailable,
           }, analysis);
@@ -640,7 +678,8 @@ const App: React.FC = () => {
       const response = await generateBotResponse(history, userInput, { ...userData, ...savingsGoal });
       
       if (response) {
-        const combinedData = { ...userData, ...savingsGoal, ...response.updatedData };
+        const localData = extractPlanDataFromInput(userInput);
+        const combinedData = { ...userData, ...savingsGoal, ...response.updatedData, ...localData };
         const nextAnalysis = buildAnalysis(combinedData, response.analysis);
         const shouldCloseAnalysis = response.action === "END" || Boolean(nextAnalysis);
         const botText = shouldCloseAnalysis && nextAnalysis
@@ -654,9 +693,9 @@ const App: React.FC = () => {
         };
         setMessages(prev => [...prev, botMessage]);
 
-        if (response.updatedData) {
-            setUserData(prev => ({...prev, ...response.updatedData}));
-            setSavingsGoal(prev => ({...prev, ...response.updatedData}));
+        if (response.updatedData || Object.keys(localData).length) {
+            setUserData(prev => ({...prev, ...response.updatedData, ...localData}));
+            setSavingsGoal(prev => ({...prev, ...response.updatedData, ...localData}));
         }
         if (shouldCloseAnalysis) {
             setAnalysis(nextAnalysis);
