@@ -40,12 +40,8 @@ const formatTimeline = (months?: number) => {
   return `${months} meses`;
 };
 
-const parseGoalAmount = (input: string) => {
+const parseMoneyAmount = (input: string) => {
   const normalized = input.toLowerCase();
-  if (!/(monto|vale|cuesta|valor|meta|mill[oó]n|millones|palos|pesos)/i.test(normalized)) {
-    return undefined;
-  }
-
   const rawValue = normalized.match(/\d+(?:[.,]\d+)?/)?.[0];
   if (!rawValue) return undefined;
 
@@ -59,14 +55,26 @@ const parseGoalAmount = (input: string) => {
   return Math.round(value);
 };
 
+const parseGoalAmount = (input: string) => {
+  if (!/(monto|vale|cuesta|valor|meta|mill[oó]n|millones|palos|pesos)/i.test(input.toLowerCase())) {
+    return undefined;
+  }
+
+  return parseMoneyAmount(input);
+};
+
 const applyPostAnalysisAdjustment = (
   input: string,
   data: UserData & SavingsGoal
 ) => {
+  const normalized = input.toLowerCase();
   const goalTimelineInMonths = parseTimelineInMonths(input);
   const goalAmount = parseGoalAmount(input);
+  const moneyAmount = parseMoneyAmount(input);
+  const income = /ingreso|gano|salario|mensualidad/.test(normalized) ? moneyAmount : undefined;
+  const expenses = /gasto|gastos|egreso|arriendo|mercado/.test(normalized) ? moneyAmount : undefined;
 
-  if (!goalTimelineInMonths && !goalAmount) {
+  if (!goalTimelineInMonths && !goalAmount && !income && !expenses) {
     return null;
   }
 
@@ -77,7 +85,44 @@ const applyPostAnalysisAdjustment = (
       goalTimeline: formatTimeline(goalTimelineInMonths),
     } : {}),
     ...(goalAmount ? { goalAmount } : {}),
+    ...(income ? { income } : {}),
+    ...(expenses ? { expenses } : {}),
   };
+};
+
+const hydratePlanData = (
+  data: UserData & SavingsGoal,
+  currentAnalysis?: Analysis | null
+) => {
+  const goalTimelineInMonths = Number(data.goalTimelineInMonths)
+    || parseTimelineInMonths(data.goalTimeline)
+    || currentAnalysis?.goalTimelineInMonths;
+  const goalAmount = Number(data.goalAmount)
+    || (currentAnalysis?.ahorroNecesarioMensual && goalTimelineInMonths
+      ? Math.round(currentAnalysis.ahorroNecesarioMensual * goalTimelineInMonths)
+      : undefined);
+  const monthlyAvailable = currentAnalysis?.monthlyAvailable
+    || (currentAnalysis?.ahorroMensual ? currentAnalysis.ahorroMensual / 0.2 : undefined);
+  const income = Number(data.income) || undefined;
+  const expenses = Number(data.expenses) || undefined;
+
+  return {
+    ...data,
+    income: income || (expenses && monthlyAvailable ? expenses + monthlyAvailable : undefined),
+    expenses: expenses || (income && monthlyAvailable ? income - monthlyAvailable : undefined),
+    goalAmount,
+    goalTimelineInMonths,
+    goalTimeline: data.goalTimeline || formatTimeline(goalTimelineInMonths),
+  };
+};
+
+const getMissingPlanFields = (data: UserData & SavingsGoal) => {
+  const missing: string[] = [];
+  if (!Number(data.income)) missing.push('ingresos mensuales');
+  if (Number.isNaN(Number(data.expenses)) || data.expenses === undefined) missing.push('gastos mensuales');
+  if (!Number(data.goalAmount)) missing.push('monto de la meta');
+  if (!Number(data.goalTimelineInMonths) && !parseTimelineInMonths(data.goalTimeline)) missing.push('plazo');
+  return missing;
 };
 
 const buildAnalysis = (
@@ -140,6 +185,7 @@ const App: React.FC = () => {
   const [userData, setUserData] = useState<UserData>({});
   const [savingsGoal, setSavingsGoal] = useState<SavingsGoal>({});
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [planData, setPlanData] = useState<(UserData & SavingsGoal) | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -169,32 +215,38 @@ const App: React.FC = () => {
     setMessages(prev => [...prev, userMessage]);
 
     if (analysis) {
-      const adjustedData = applyPostAnalysisAdjustment(userInput, { ...userData, ...savingsGoal });
+      const basePlan = planData || hydratePlanData({ ...userData, ...savingsGoal }, analysis);
+      const adjustedData = applyPostAnalysisAdjustment(userInput, basePlan);
 
       if (adjustedData) {
-        const nextAnalysis = buildAnalysis(adjustedData);
+        const completeAdjustedData = hydratePlanData(adjustedData, analysis);
+        const nextAnalysis = buildAnalysis(completeAdjustedData);
+        const missingFields = getMissingPlanFields(completeAdjustedData);
         const adjustmentMessage: Message = {
           id: `${Date.now()}-bot`,
           text: nextAnalysis
-            ? `¡Listo! Ajusté el análisis con ${adjustedData.goalTimeline ? `plazo de ${adjustedData.goalTimeline}` : 'los nuevos datos'}. Revisa cómo cambia el plan aquí abajo.`
-            : 'Listo, tomé el ajuste. Dame un dato más para recalcular bien el plan.',
+            ? `¡Listo! Ajusté el análisis con ${completeAdjustedData.goalTimeline ? `plazo de ${completeAdjustedData.goalTimeline}` : 'los nuevos datos'}. Revisa cómo cambia el plan aquí abajo.`
+            : `Listo, tomé el ajuste. Para recalcular bien me falta: ${missingFields.join(', ')}.`,
           sender: 'bot',
           analysis: nextAnalysis || undefined,
         };
 
         setUserData({
-          name: adjustedData.name,
-          income: adjustedData.income,
-          expenses: adjustedData.expenses,
+          name: completeAdjustedData.name,
+          income: completeAdjustedData.income,
+          expenses: completeAdjustedData.expenses,
         });
         setSavingsGoal({
-          goalName: adjustedData.goalName,
-          goalAmount: adjustedData.goalAmount,
-          goalTimeline: adjustedData.goalTimeline,
-          goalStartDate: adjustedData.goalStartDate,
-          goalTimelineInMonths: adjustedData.goalTimelineInMonths,
+          goalName: completeAdjustedData.goalName,
+          goalAmount: completeAdjustedData.goalAmount,
+          goalTimeline: completeAdjustedData.goalTimeline,
+          goalStartDate: completeAdjustedData.goalStartDate,
+          goalTimelineInMonths: completeAdjustedData.goalTimelineInMonths,
         });
-        setAnalysis(nextAnalysis);
+        setPlanData(completeAdjustedData);
+        if (nextAnalysis) {
+          setAnalysis(nextAnalysis);
+        }
         setMessages(prev => [...prev, adjustmentMessage]);
         return;
       }
@@ -241,6 +293,7 @@ const App: React.FC = () => {
         }
         if (shouldCloseAnalysis) {
             setAnalysis(nextAnalysis);
+            setPlanData(hydratePlanData(combinedData, nextAnalysis));
         }
       } else {
         throw new Error("Invalid response from API");
