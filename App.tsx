@@ -179,6 +179,44 @@ const parseGoalAmount = (input: string) => {
     || parseMoneyValueFromText(input);
 };
 
+type AdjustmentMode = 'extraIncome' | 'timeline' | 'expenses' | 'goalAmount';
+
+const getAdjustmentMenu = () =>
+  '¿Quieres ajustar algo más?\n\n' +
+  '1. Sumar ingreso extra 💼\n' +
+  '2. Cambiar plazo 🗓️\n' +
+  '3. Cambiar gastos mensuales 💸\n' +
+  '4. Cambiar monto de la meta 🎯\n' +
+  '5. Estoy satisfecho ✅';
+
+const getAdjustmentModeFromInput = (input: string): AdjustmentMode | 'done' | null => {
+  const normalized = normalizeText(input);
+
+  if (/^(5|cinco)\b/.test(normalized) || isClosingThanks(input)) return 'done';
+  if (/^(1|uno)\b/.test(normalized) || /(ingreso extra|extra|adicional|gano mas|otra entrada|rebusque)/.test(normalized)) return 'extraIncome';
+  if (/^(2|dos)\b/.test(normalized) || /(plazo|tiempo|meses|anos|ano|anios|años)/.test(normalized)) return 'timeline';
+  if (/^(3|tres)\b/.test(normalized) || /(gasto|gastos|egreso|arriendo|mercado)/.test(normalized)) return 'expenses';
+  if (/^(4|cuatro)\b/.test(normalized) || /(monto|valor|cuesta|vale|meta)/.test(normalized)) return 'goalAmount';
+
+  return null;
+};
+
+const getAdjustmentPrompt = (mode: AdjustmentMode) => {
+  if (mode === 'extraIncome') {
+    return 'De una, sumemos ese ingreso extra 💼. ¿Cuánto ingreso extra mensual quieres agregar? Ej: "800 mil extra" o "2 millones adicionales".';
+  }
+
+  if (mode === 'timeline') {
+    return 'Listo, ajustemos el plazo 🗓️. ¿En cuánto tiempo quieres lograr la meta? Ej: "8 meses", "2.5 años" o "30 meses".';
+  }
+
+  if (mode === 'expenses') {
+    return 'Hagámosle a los gastos 💸. Dime el nuevo total de gastos mensuales. Ej: "mis gastos ahora son 2.8 millones".';
+  }
+
+  return 'Perfecto, cambiemos el monto de la meta 🎯. ¿Cuál es el nuevo valor total? Ej: "la meta ahora vale 18 millones".';
+};
+
 const applyPostAnalysisAdjustment = (
   input: string,
   data: UserData & SavingsGoal
@@ -218,10 +256,13 @@ const hydratePlanData = (
     || (currentAnalysis?.ahorroNecesarioMensual && goalTimelineInMonths
       ? Math.round(currentAnalysis.ahorroNecesarioMensual * goalTimelineInMonths)
       : undefined);
-  const monthlyAvailable = currentAnalysis?.monthlyAvailable
-    || (currentAnalysis?.ahorroMensual ? currentAnalysis.ahorroMensual / 0.2 : undefined);
   const income = Number(data.income) || undefined;
   const expenses = Number(data.expenses) || undefined;
+  const explicitMonthlyAvailable = Number(data.monthlyAvailable) || undefined;
+  const monthlyAvailable = explicitMonthlyAvailable
+    || (income && !Number.isNaN(expenses) ? income - expenses : undefined)
+    || currentAnalysis?.monthlyAvailable
+    || (currentAnalysis?.ahorroMensual ? currentAnalysis.ahorroMensual / 0.2 : undefined);
 
   return {
     ...data,
@@ -282,11 +323,13 @@ const buildAnalysis = (
 };
 
 const getFinalMessage = (analysis: Analysis) => {
+  const followUp = `\n\n${getAdjustmentMenu()}`;
+
   if (analysis.isViable) {
-    return '¡Listo! Ya tengo tu análisis completo. La meta se ve alcanzable con tu capacidad de ahorro actual; mira el resumen visual aquí abajo.';
+    return `¡Listo! Ya tengo tu análisis completo. La meta se ve alcanzable con tu capacidad de ahorro actual; mira el resumen visual aquí abajo.${followUp}`;
   }
 
-  return '¡Listo! Ya tengo tu análisis completo. La meta necesita algunos ajustes, pero aquí abajo ves exactamente qué mover para acercarte.';
+  return `¡Listo! Ya tengo tu análisis completo. La meta necesita algunos ajustes, pero aquí abajo ves exactamente qué mover para acercarte.${followUp}`;
 };
 
 const normalizeText = (input: string) =>
@@ -343,7 +386,7 @@ const getPostAnalysisMessage = (input: string) => {
     return 'Listo, ajustamos tus datos mensuales. Dime el valor completo, por ejemplo: "gano 6 millones", "tengo 2 millones extra" o "mis gastos son 2.5 millones".';
   }
 
-  return 'Claro, lo seguimos revisando. Dime qué quieres ajustar: plazo, monto de la meta o gastos mensuales.';
+  return `Claro, lo seguimos revisando. Escoge qué quieres ajustar:\n\n${getAdjustmentMenu()}`;
 };
 
 const App: React.FC = () => {
@@ -352,6 +395,7 @@ const App: React.FC = () => {
   const [savingsGoal, setSavingsGoal] = useState<SavingsGoal>({});
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [planData, setPlanData] = useState<(UserData & SavingsGoal) | null>(null);
+  const [adjustmentMode, setAdjustmentMode] = useState<AdjustmentMode | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -376,7 +420,11 @@ const App: React.FC = () => {
     setMessages(prev => [...prev, userMessage]);
 
     if (analysis) {
-      if (isClosingThanks(userInput)) {
+      const basePlan = planData || hydratePlanData({ ...userData, ...savingsGoal }, analysis);
+      const selectedMode = adjustmentMode || getAdjustmentModeFromInput(userInput);
+
+      if (selectedMode === 'done') {
+        setAdjustmentMode(null);
         const botMessage: Message = {
           id: `${Date.now()}-bot`,
           text: '¡Con mucho gusto! Me alegra que te haya servido el análisis. Si más adelante quieres ajustar algo o revisar otra meta, aquí sigo para ayudarte.',
@@ -386,7 +434,154 @@ const App: React.FC = () => {
         return;
       }
 
-      const basePlan = planData || hydratePlanData({ ...userData, ...savingsGoal }, analysis);
+      if (selectedMode && selectedMode !== 'done') {
+        const valueFromInput = selectedMode === 'timeline'
+          ? parseTimelineInMonths(userInput)
+          : parseMoneyAmount(userInput);
+
+        if (!adjustmentMode && !valueFromInput) {
+          setAdjustmentMode(selectedMode);
+          const botMessage: Message = {
+            id: `${Date.now()}-bot`,
+            text: getAdjustmentPrompt(selectedMode),
+            sender: 'bot',
+          };
+          setMessages(prev => [...prev, botMessage]);
+          return;
+        }
+
+        let completeAdjustedData: UserData & SavingsGoal | null = null;
+        let adjustmentLabel = 'los nuevos datos';
+
+        if (selectedMode === 'extraIncome') {
+          const extraIncome = parseExtraIncomeAmount(userInput) || parseMoneyAmount(userInput);
+
+          if (!extraIncome) {
+            setAdjustmentMode('extraIncome');
+            const botMessage: Message = {
+              id: `${Date.now()}-bot`,
+              text: getAdjustmentPrompt('extraIncome'),
+              sender: 'bot',
+            };
+            setMessages(prev => [...prev, botMessage]);
+            return;
+          }
+
+          const currentMonthlyAvailable = Number(basePlan.monthlyAvailable)
+            || (Number(basePlan.income) && !Number.isNaN(Number(basePlan.expenses))
+              ? Number(basePlan.income) - Number(basePlan.expenses)
+              : 0);
+          const nextMonthlyAvailable = currentMonthlyAvailable + extraIncome;
+
+          completeAdjustedData = hydratePlanData({
+            ...basePlan,
+            income: Number(basePlan.income) ? Number(basePlan.income) + extraIncome : undefined,
+            monthlyAvailable: nextMonthlyAvailable,
+          }, analysis);
+          adjustmentLabel = `ingreso extra de ${extraIncome.toLocaleString('es-CO')} pesos mensuales`;
+        }
+
+        if (selectedMode === 'timeline') {
+          const goalTimelineInMonths = parseTimelineInMonths(userInput);
+
+          if (!goalTimelineInMonths) {
+            setAdjustmentMode('timeline');
+            const botMessage: Message = {
+              id: `${Date.now()}-bot`,
+              text: getAdjustmentPrompt('timeline'),
+              sender: 'bot',
+            };
+            setMessages(prev => [...prev, botMessage]);
+            return;
+          }
+
+          completeAdjustedData = hydratePlanData({
+            ...basePlan,
+            goalTimelineInMonths,
+            goalTimeline: formatTimeline(goalTimelineInMonths),
+          }, analysis);
+          adjustmentLabel = `plazo de ${formatTimeline(goalTimelineInMonths)}`;
+        }
+
+        if (selectedMode === 'expenses') {
+          const expenses = parseMoneyAmount(userInput);
+
+          if (!expenses) {
+            setAdjustmentMode('expenses');
+            const botMessage: Message = {
+              id: `${Date.now()}-bot`,
+              text: getAdjustmentPrompt('expenses'),
+              sender: 'bot',
+            };
+            setMessages(prev => [...prev, botMessage]);
+            return;
+          }
+
+          const income = Number(basePlan.income) || undefined;
+          completeAdjustedData = hydratePlanData({
+            ...basePlan,
+            expenses,
+            monthlyAvailable: income ? income - expenses : basePlan.monthlyAvailable,
+          }, analysis);
+          adjustmentLabel = `gastos mensuales de ${expenses.toLocaleString('es-CO')} pesos`;
+        }
+
+        if (selectedMode === 'goalAmount') {
+          const goalAmount = parseGoalAmount(userInput) || parseMoneyAmount(userInput);
+
+          if (!goalAmount) {
+            setAdjustmentMode('goalAmount');
+            const botMessage: Message = {
+              id: `${Date.now()}-bot`,
+              text: getAdjustmentPrompt('goalAmount'),
+              sender: 'bot',
+            };
+            setMessages(prev => [...prev, botMessage]);
+            return;
+          }
+
+          completeAdjustedData = hydratePlanData({
+            ...basePlan,
+            goalAmount,
+          }, analysis);
+          adjustmentLabel = `monto de meta de ${goalAmount.toLocaleString('es-CO')} pesos`;
+        }
+
+        if (completeAdjustedData) {
+          const nextAnalysis = buildAnalysis(completeAdjustedData);
+          const missingFields = getMissingPlanFields(completeAdjustedData);
+          const adjustmentMessage: Message = {
+            id: `${Date.now()}-bot`,
+            text: nextAnalysis
+              ? `¡Listo! Ajusté el análisis con ${adjustmentLabel}. Revisa cómo cambia el plan aquí abajo.\n\n${getAdjustmentMenu()}`
+              : `Listo, tomé el ajuste. Para recalcular bien me falta: ${missingFields.join(', ')}.`,
+            sender: 'bot',
+            analysis: nextAnalysis || undefined,
+          };
+
+          setAdjustmentMode(null);
+          setUserData({
+            name: completeAdjustedData.name,
+            income: completeAdjustedData.income,
+            expenses: completeAdjustedData.expenses,
+            monthlyAvailable: completeAdjustedData.monthlyAvailable,
+          });
+          setSavingsGoal({
+            goalName: completeAdjustedData.goalName,
+            goalAmount: completeAdjustedData.goalAmount,
+            goalTimeline: completeAdjustedData.goalTimeline,
+            goalStartDate: completeAdjustedData.goalStartDate,
+            goalTimelineInMonths: completeAdjustedData.goalTimelineInMonths,
+          });
+          setPlanData(completeAdjustedData);
+          if (nextAnalysis) {
+            setAnalysis(nextAnalysis);
+          }
+          setMessages(prev => [...prev, adjustmentMessage]);
+          return;
+        }
+      }
+
       const adjustedData = applyPostAnalysisAdjustment(userInput, basePlan);
 
       if (adjustedData) {
@@ -396,7 +591,7 @@ const App: React.FC = () => {
         const adjustmentMessage: Message = {
           id: `${Date.now()}-bot`,
           text: nextAnalysis
-            ? `¡Listo! Ajusté el análisis con ${completeAdjustedData.goalTimeline ? `plazo de ${completeAdjustedData.goalTimeline}` : 'los nuevos datos'}. Revisa cómo cambia el plan aquí abajo.`
+            ? `¡Listo! Ajusté el análisis con ${completeAdjustedData.goalTimeline ? `plazo de ${completeAdjustedData.goalTimeline}` : 'los nuevos datos'}. Revisa cómo cambia el plan aquí abajo.\n\n${getAdjustmentMenu()}`
             : `Listo, tomé el ajuste. Para recalcular bien me falta: ${missingFields.join(', ')}.`,
           sender: 'bot',
           analysis: nextAnalysis || undefined,
