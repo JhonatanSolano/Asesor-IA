@@ -208,9 +208,10 @@ const parseExpenseChange = (input: string) => {
   if (!amount) return null;
 
   const isDecrease = /\b(gasto|gastos|egreso|egresos|arriendo|mercado)\b.{0,60}\b(menos|baj|reduzc|reduje|redujo|disminu)|\b(menos|baj|reduzc|reduje|redujo|disminu)\b.{0,60}\b(gasto|gastos|egreso|egresos|arriendo|mercado)\b/.test(normalized);
+  const isReplace = /\b(total|ahora|actual(?:es)?|qued(?:a|an)|son|es)\b/.test(normalized) && !/\bmas\b/.test(normalized);
   return {
     amount,
-    operation: isDecrease ? 'decrease' as const : 'increase' as const,
+    operation: isDecrease ? 'decrease' as const : isReplace ? 'replace' as const : 'increase' as const,
   };
 };
 
@@ -231,7 +232,8 @@ const extractPlanDataFromInput = (input: string): Partial<UserData & SavingsGoal
   };
 };
 
-type AdjustmentMode = 'extraIncome' | 'timeline' | 'expenses' | 'goalAmount';
+type ExpenseOperation = 'increase' | 'decrease' | 'replace';
+type AdjustmentMode = 'extraIncome' | 'timeline' | 'expenseIncrease' | 'expenseDecrease' | 'expenseReplace' | 'goalAmount';
 
 const getAdjustmentMenu = () =>
   '¿Quieres ajustar algo más? Puedes tocar una opción o escribirme el cambio con tus palabras.';
@@ -239,7 +241,9 @@ const getAdjustmentMenu = () =>
 const adjustmentQuickReplies: QuickReply[] = [
   { label: '💼 Sumar ingreso extra', value: 'Sumar ingreso extra' },
   { label: '🗓️ Cambiar plazo', value: 'Cambiar plazo' },
-  { label: '💸 Sumar gastos', value: 'Cambiar gastos mensuales' },
+  { label: '💸 Subieron gastos', value: 'Subieron gastos' },
+  { label: '📉 Bajaron gastos', value: 'Bajaron gastos' },
+  { label: '🧾 Total de gastos', value: 'Reemplazar total de gastos' },
   { label: '🎯 Cambiar meta', value: 'Cambiar monto de la meta' },
   { label: '✅ Estoy satisfecho', value: 'Estoy satisfecho' },
 ];
@@ -250,7 +254,9 @@ const getAdjustmentModeFromInput = (input: string): AdjustmentMode | 'done' | nu
   if (/^(5|cinco)\b/.test(normalized) || isClosingThanks(input)) return 'done';
   if (/^(1|uno)\b/.test(normalized) || /(ingreso extra|extra|adicional|gano .*mas|otra entrada|rebusque)/.test(normalized)) return 'extraIncome';
   if (/^(2|dos)\b/.test(normalized) || /\b(plazo|tiempo|meses|mes|anos|ano|anios|años)\b/.test(normalized)) return 'timeline';
-  if (/^(3|tres)\b/.test(normalized) || /\b(gasto|gastos|egreso|egresos|arriendo|mercado)\b/.test(normalized)) return 'expenses';
+  if (/\b(reemplazar total de gastos|total de gastos|gastos totales|mis gastos son|gastos ahora son)\b/.test(normalized)) return 'expenseReplace';
+  if (/\b(bajaron gastos|bajar gastos|menos gastos|gasto menos|gastos menos|reduje gastos|disminuir gastos)\b/.test(normalized)) return 'expenseDecrease';
+  if (/^(3|tres)\b/.test(normalized) || /\b(subieron gastos|sumar gastos|mas gastos|gasto mas|gastos mas|gasto|gastos|egreso|egresos|arriendo|mercado)\b/.test(normalized)) return 'expenseIncrease';
   if (/^(4|cuatro)\b/.test(normalized) || /(monto|valor|cuesta|vale|meta)/.test(normalized)) return 'goalAmount';
 
   return null;
@@ -265,8 +271,16 @@ const getAdjustmentPrompt = (mode: AdjustmentMode) => {
     return 'Listo, ajustemos el plazo 🗓️. ¿En cuánto tiempo quieres lograr la meta? Ej: "8 meses", "2.5 años" o "30 meses".';
   }
 
-  if (mode === 'expenses') {
-    return 'Hagámosle a los gastos 💸. Dime cuánto gasto mensual se suma. Ej: "2.8 millones más". Si bajaron, dime algo como "1 millón menos".';
+  if (mode === 'expenseIncrease') {
+    return 'Listo, sumemos gastos 💸. ¿Cuánto aumentaron tus gastos mensuales? Ej: "1 millón más".';
+  }
+
+  if (mode === 'expenseDecrease') {
+    return 'Qué buena esa bajada 📉. ¿Cuánto disminuyeron tus gastos mensuales? Ej: "800 mil menos".';
+  }
+
+  if (mode === 'expenseReplace') {
+    return 'Perfecto, reemplacemos el total 🧾. ¿Cuál es tu nuevo total de gastos mensuales? Ej: "13 millones".';
   }
 
   return 'Perfecto, cambiemos el monto de la meta 🎯. ¿Cuál es el nuevo valor total? Ej: "la meta ahora vale 18 millones".';
@@ -295,7 +309,9 @@ const applyPostAnalysisAdjustment = (
   const nextExpenses = expenseChange
     ? (expenseChange.operation === 'decrease'
       ? Math.max(currentExpenses - expenseChange.amount, 0)
-      : currentExpenses + expenseChange.amount)
+      : expenseChange.operation === 'replace'
+        ? expenseChange.amount
+        : currentExpenses + expenseChange.amount)
     : undefined;
 
   return {
@@ -342,6 +358,29 @@ const hydratePlanData = (
     goalTimelineInMonths,
     goalTimeline: data.goalTimeline || formatTimeline(goalTimelineInMonths),
   };
+};
+
+const getCurrentExpenses = (data: UserData & SavingsGoal) => {
+  const expenses = Number(data.expenses);
+  if (Number.isFinite(expenses)) return expenses;
+
+  const income = Number(data.income);
+  const monthlyAvailable = Number(data.monthlyAvailable);
+  if (Number.isFinite(income) && Number.isFinite(monthlyAvailable)) {
+    return income - monthlyAvailable;
+  }
+
+  return 0;
+};
+
+const applyExpenseOperation = (
+  currentExpenses: number,
+  amount: number,
+  operation: ExpenseOperation
+) => {
+  if (operation === 'decrease') return Math.max(currentExpenses - amount, 0);
+  if (operation === 'replace') return amount;
+  return currentExpenses + amount;
 };
 
 const calculateMonthlyAvailable = (data: UserData & SavingsGoal) => {
@@ -546,17 +585,15 @@ const App: React.FC = () => {
           }
 
           const currentIncome = Number(basePlan.income) || 0;
-          const currentExpenses = Number(basePlan.expenses) || undefined;
+          const currentExpenses = getCurrentExpenses(basePlan);
           const currentMonthlyAvailable = Number(basePlan.monthlyAvailable)
             || (currentIncome && !Number.isNaN(Number(basePlan.expenses))
               ? currentIncome - Number(basePlan.expenses)
               : 0);
           const expenseChange = parseExpenseChange(userInput);
           const nextIncome = currentIncome ? currentIncome + extraIncome : undefined;
-          const nextExpenses = expenseChange && currentExpenses !== undefined
-            ? (expenseChange.operation === 'decrease'
-              ? Math.max(currentExpenses - expenseChange.amount, 0)
-              : currentExpenses + expenseChange.amount)
+          const nextExpenses = expenseChange
+            ? applyExpenseOperation(currentExpenses, expenseChange.amount, expenseChange.operation)
             : currentExpenses;
           const nextMonthlyAvailable = nextIncome && nextExpenses !== undefined
             ? nextIncome - nextExpenses
@@ -595,33 +632,37 @@ const App: React.FC = () => {
           adjustmentLabel = `plazo de ${formatTimeline(goalTimelineInMonths)}`;
         }
 
-        if (selectedMode === 'expenses') {
+        if (selectedMode === 'expenseIncrease' || selectedMode === 'expenseDecrease' || selectedMode === 'expenseReplace') {
           const parsedExpenseChange = parseExpenseChange(userInput);
-          const expenseChange = parsedExpenseChange || (adjustmentMode === 'expenses' && parseMoneyAmount(userInput)
-            ? {
-              amount: parseMoneyAmount(userInput) as number,
-              operation: normalizeText(userInput).includes('menos') ? 'decrease' as const : 'increase' as const,
-            }
-            : null);
+          const amount = parseMoneyAmount(userInput);
+          const selectedExpenseOperation: ExpenseOperation =
+            selectedMode === 'expenseDecrease'
+              ? 'decrease'
+              : selectedMode === 'expenseReplace'
+                ? 'replace'
+                : 'increase';
+          const expenseChange = adjustmentMode && amount
+            ? { amount, operation: selectedExpenseOperation }
+            : parsedExpenseChange || (amount
+              ? { amount, operation: selectedExpenseOperation }
+              : null);
 
           if (!expenseChange) {
-            setAdjustmentMode('expenses');
+            setAdjustmentMode(selectedMode);
             const botMessage: Message = {
               id: `${Date.now()}-bot`,
-              text: getAdjustmentPrompt('expenses'),
+              text: getAdjustmentPrompt(selectedMode),
               sender: 'bot',
             };
             setMessages(prev => [...prev, botMessage]);
             return;
           }
 
-          const previousExpenses = Number(basePlan.expenses) || undefined;
+          const previousExpenses = getCurrentExpenses(basePlan);
           const previousMonthlyAvailable = Number(basePlan.monthlyAvailable) || undefined;
           const income = Number(basePlan.income)
             || (previousExpenses && previousMonthlyAvailable ? previousExpenses + previousMonthlyAvailable : undefined);
-          const expenses = expenseChange.operation === 'decrease'
-            ? Math.max((previousExpenses || 0) - expenseChange.amount, 0)
-            : (previousExpenses || 0) + expenseChange.amount;
+          const expenses = applyExpenseOperation(previousExpenses, expenseChange.amount, expenseChange.operation);
           completeAdjustedData = hydratePlanData({
             ...basePlan,
             income,
@@ -630,7 +671,9 @@ const App: React.FC = () => {
           }, analysis);
           adjustmentLabel = expenseChange.operation === 'decrease'
             ? `gastos reducidos en ${expenseChange.amount.toLocaleString('es-CO')} pesos`
-            : `gasto adicional de ${expenseChange.amount.toLocaleString('es-CO')} pesos mensuales`;
+            : expenseChange.operation === 'replace'
+              ? `nuevo total de gastos de ${expenseChange.amount.toLocaleString('es-CO')} pesos`
+              : `gasto adicional de ${expenseChange.amount.toLocaleString('es-CO')} pesos mensuales`;
         }
 
         if (selectedMode === 'goalAmount') {
