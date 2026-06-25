@@ -43,6 +43,10 @@ Reglas:
 - Siempre responde con JSON puro, sin markdown fences.
 - El JSON debe tener: responseText, action, updatedData y opcionalmente analysis.
 - action debe ser "UPDATE_DATA" o "END".
+- Cuando ya tengas ingresos, gastos, meta, monto y plazo, responde con action "END" inmediatamente. No digas "dame un segundo" ni esperes otro mensaje.
+- En la respuesta final, responseText debe ser corto: maximo 3 frases. No pongas todos los calculos en texto; el frontend los mostrara en tarjetas y grafico.
+- En analysis incluye siempre: goalTimelineInMonths, ahorroMensual, ahorroNecesarioMensual, progresoPorcentaje, isViable y sugerencias.
+- Si el usuario escribe confirmaciones como "si", "ok", "ya?" o "listo", continua con el siguiente dato pendiente o termina el analisis si ya tienes todo.
 `;
 
 function getApiKey(): string | undefined {

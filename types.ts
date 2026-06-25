@@ -22,7 +22,10 @@ export interface SavingsGoal {
 export interface Analysis {
   isViable: boolean;
   ahorroMensual: number;
+  ahorroNecesarioMensual?: number;
   progresoPorcentaje: number;
+  goalTimelineInMonths?: number;
+  monthlyAvailable?: number;
   sugerencias: string[];
 }
 

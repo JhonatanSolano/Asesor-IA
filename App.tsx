@@ -19,6 +19,56 @@ const isTechnicalMessage = (message: Message) => {
   ].some(prefix => message.text.startsWith(prefix));
 };
 
+const parseTimelineInMonths = (timeline?: string) => {
+  if (!timeline) return undefined;
+
+  const normalized = timeline.toLowerCase();
+  const value = Number(normalized.match(/\d+(?:[.,]\d+)?/)?.[0]?.replace(',', '.'));
+  if (!value) return undefined;
+
+  if (normalized.includes('año') || normalized.includes('ano')) {
+    return Math.round(value * 12);
+  }
+
+  return Math.round(value);
+};
+
+const buildAnalysis = (
+  data: UserData & SavingsGoal,
+  modelAnalysis?: Analysis
+): Analysis | null => {
+  const income = Number(data.income);
+  const expenses = Number(data.expenses);
+  const goalAmount = Number(data.goalAmount);
+  const goalTimelineInMonths = Number(data.goalTimelineInMonths) || parseTimelineInMonths(data.goalTimeline);
+
+  if (!income || !goalAmount || !goalTimelineInMonths || Number.isNaN(expenses)) {
+    return modelAnalysis || null;
+  }
+
+  const monthlyAvailable = income - expenses;
+  const ahorroMensual = Math.max(monthlyAvailable * 0.2, 0);
+  const ahorroNecesarioMensual = goalAmount / goalTimelineInMonths;
+  const progresoPorcentaje = ahorroNecesarioMensual > 0
+    ? (ahorroMensual / ahorroNecesarioMensual) * 100
+    : 0;
+
+  return {
+    ...modelAnalysis,
+    monthlyAvailable,
+    ahorroMensual,
+    ahorroNecesarioMensual,
+    goalTimelineInMonths,
+    progresoPorcentaje,
+    isViable: ahorroMensual > 0 && progresoPorcentaje >= 50,
+    sugerencias: modelAnalysis?.sugerencias?.length ? modelAnalysis.sugerencias : [
+      'Separa el ahorro apenas recibas tus ingresos para que no se mezcle con los gastos del mes.',
+      'Revisa los gastos variables y define un tope semanal para mantener el plan bajo control.',
+      'Si quieres llegar antes, aumenta el porcentaje de ahorro o busca un ingreso extra puntual.',
+    ],
+  };
+};
+
 const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [userData, setUserData] = useState<UserData>({});
@@ -76,8 +126,9 @@ const App: React.FC = () => {
             setUserData(prev => ({...prev, ...response.updatedData}));
             setSavingsGoal(prev => ({...prev, ...response.updatedData}));
         }
-        if (response.action === "END" && response.analysis) {
-            setAnalysis(response.analysis);
+        if (response.action === "END") {
+            const combinedData = { ...userData, ...savingsGoal, ...response.updatedData };
+            setAnalysis(buildAnalysis(combinedData, response.analysis));
         }
       } else {
         throw new Error("Invalid response from API");
@@ -110,7 +161,7 @@ const App: React.FC = () => {
           <ChatMessage key={msg.id} message={msg} />
         ))}
         {isLoading && <Spinner />}
-        {analysis && analysis.isViable && (
+        {analysis && (
           <div className="bg-gray-50 rounded-lg p-4 shadow-inner">
             <h3 className="text-xl font-bold text-center mb-2 text-green-700">¡Análisis de tu Meta! 🚀</h3>
             <SavingsChart analysis={analysis} />
