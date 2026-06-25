@@ -35,6 +35,12 @@ Estilo:
 - Para fórmulas largas usa una línea separada con LaTeX entre \[ y \].
 - Acompaña cada fórmula con explicación en palabras sencillas.
 - Si generas ejercicios, opciones o soluciones, las expresiones matemáticas también deben ir en LaTeX.
+- Escribe variables, razones, ecuaciones, porcentajes, funciones, fracciones y raíces en LaTeX.
+- En pasos algebraicos, usa una fórmula por línea cuando sea necesario. Ejemplo:
+  \[
+  x = \frac{150000 \cdot 60000}{250000}
+  \]
+- Para dinero o cantidades en texto, puedes escribir "$150.000", pero las operaciones con esas cantidades deben ir en LaTeX.
 - No uses el formato incorrecto [ \frac{a}{b} ]. El formato correcto es \[\frac{a}{b}\].
 - No uses el formato incorrecto $(x)$. El formato correcto es \(x\).
 - Mantén notación consistente y evita errores algebraicos. Verifica mentalmente cada respuesta antes de entregarla.

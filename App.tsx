@@ -80,8 +80,7 @@ const isTechnicalMessage = (message: Message) => {
   if (message.sender !== 'bot') return false;
 
   return [
-    'Error del Profe-Servidor:',
-    '¡Uy, profe! Algo falló',
+    'Algo falló',
     'Estoy con mucho tráfico',
   ].some(prefix => message.text.startsWith(prefix));
 };

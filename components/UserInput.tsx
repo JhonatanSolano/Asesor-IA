@@ -23,7 +23,7 @@ const UserInput: React.FC<UserInputProps> = ({ onSubmit, isLoading }) => {
         type="text"
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
-        placeholder={isLoading ? "El profe IA está pensando..." : "Escribe tu pregunta, tema o instrucción..."}
+        placeholder={isLoading ? "El tutor está pensando..." : "Escribe tu pregunta, tema o instrucción..."}
         disabled={isLoading}
         className="flex-1 p-3 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-200"
         aria-label="Chat input"

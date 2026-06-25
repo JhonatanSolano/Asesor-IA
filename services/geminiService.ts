@@ -15,21 +15,28 @@ export const generateBotResponse = async (
     });
 
     if (!response.ok) {
-      let errorMessage = `¡Uy, profe! El servidor respondió con un error ${response.status}.`;
+      let errorMessage = `No pude conectar con el modelo en este momento. Intenta enviar tu mensaje otra vez en unos segundos.`;
       try {
         // Intentar parsear el mensaje de error del backend para más contexto
         const errorData = await response.json();
         console.error("Error from backend:", errorData);
         if (response.status === 503) {
-          errorMessage = "Estoy con mucho tráfico por un momento. Intenta enviar tu mensaje otra vez en unos segundos, profe.";
+          errorMessage = [
+            'Estoy con mucho tráfico por un momento, estudiante. Intenta enviar tu mensaje otra vez en unos segundos.',
+            '',
+            'Mientras tanto, puedes escribirlo así para que lo resolvamos más rápido:',
+            '- Tema:',
+            '- Enunciado:',
+            '- Qué necesitas: resolver, practicar o revisar error.',
+          ].join('\n');
         } else if (errorData.error) {
           // Usar el mensaje de error específico de nuestra API
-          errorMessage = `Error del Profe-Servidor: ${errorData.error}`;
+          errorMessage = `No pude generar la respuesta ahora mismo. Intenta reenviar tu pregunta en unos segundos.`;
         }
       } catch (e) {
         console.error("No se pudo parsear el JSON de error del backend.", e);
         // Fallback si la respuesta no es JSON
-        errorMessage = `¡Uy, parce! Algo falló en la comunicación con el servidor (${response.statusText}).`;
+        errorMessage = `Algo falló en la comunicación con el servidor. Intenta otra vez en unos segundos.`;
       }
       return {
         responseText: errorMessage,
@@ -43,7 +50,7 @@ export const generateBotResponse = async (
   } catch (error) {
     console.error("Error llamando a la API del backend:", error);
     return {
-      responseText: "¡Uy, profe! 😬 Parece que algo se rompió en la comunicación. Revisa tu conexión a internet y vuelve a intentarlo, porfa.",
+      responseText: "No pude conectar con el tutor en este momento. Revisa tu conexión e intenta enviar tu pregunta otra vez.",
       action: "RESPOND",
     };
   }

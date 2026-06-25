@@ -8,7 +8,7 @@ const Spinner: React.FC = () => {
         <div className="w-4 h-4 rounded-full animate-pulse bg-green-500"></div>
         <div className="w-4 h-4 rounded-full animate-pulse bg-green-500" style={{ animationDelay: '0.2s' }}></div>
         <div className="w-4 h-4 rounded-full animate-pulse bg-green-500" style={{ animationDelay: '0.4s' }}></div>
-        <span className="text-gray-500 ml-2">El profe IA está pensando...</span>
+        <span className="text-gray-500 ml-2">El tutor está pensando...</span>
       </div>
     </div>
   );
