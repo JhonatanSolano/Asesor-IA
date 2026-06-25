@@ -1,5 +1,5 @@
 {
-  "name": "Asesor-IA: Tu Pana Financiero",
-  "description": "Chatbot asesor financiero colombiano con gráficos interactivos y análisis de metas de ahorro, impulsado por la API de Gemini.",
+  "name": "Profe IA Matemáticas PREICFES",
+  "description": "Tutor matemático para PREU y PREICFES: resuelve preguntas, genera ejercicios tipo ICFES y crea material de clase con Gemini.",
   "requestFramePermissions": []
 }

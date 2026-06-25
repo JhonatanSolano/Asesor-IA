@@ -15,16 +15,16 @@ export const generateBotResponse = async (
     });
 
     if (!response.ok) {
-      let errorMessage = `¡Uy, parce! El servidor respondió con un error ${response.status}.`;
+      let errorMessage = `¡Uy, profe! El servidor respondió con un error ${response.status}.`;
       try {
         // Intentar parsear el mensaje de error del backend para más contexto
         const errorData = await response.json();
         console.error("Error from backend:", errorData);
         if (response.status === 503) {
-          errorMessage = "Estoy con mucho tráfico por un momento. Intenta enviar tu mensaje otra vez en unos segundos, porfa.";
+          errorMessage = "Estoy con mucho tráfico por un momento. Intenta enviar tu mensaje otra vez en unos segundos, profe.";
         } else if (errorData.error) {
           // Usar el mensaje de error específico de nuestra API
-          errorMessage = `Error del Pana-Servidor: ${errorData.error}`;
+          errorMessage = `Error del Profe-Servidor: ${errorData.error}`;
         }
       } catch (e) {
         console.error("No se pudo parsear el JSON de error del backend.", e);
@@ -33,7 +33,7 @@ export const generateBotResponse = async (
       }
       return {
         responseText: errorMessage,
-        action: "UPDATE_DATA",
+        action: "RESPOND",
       };
     }
 
@@ -43,8 +43,8 @@ export const generateBotResponse = async (
   } catch (error) {
     console.error("Error llamando a la API del backend:", error);
     return {
-      responseText: "¡Uy, parce! 😬 Parece que algo se rompió en la comunicación. Revisa tu conexión a internet y vuelve a intentarlo, porfa.",
-      action: "UPDATE_DATA",
+      responseText: "¡Uy, profe! 😬 Parece que algo se rompió en la comunicación. Revisa tu conexión a internet y vuelve a intentarlo, porfa.",
+      action: "RESPOND",
     };
   }
 };
