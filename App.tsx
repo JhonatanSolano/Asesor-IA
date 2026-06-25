@@ -33,6 +33,53 @@ const parseTimelineInMonths = (timeline?: string) => {
   return Math.round(value);
 };
 
+const formatTimeline = (months?: number) => {
+  if (!months) return 'el nuevo plazo';
+  if (months % 12 === 0) return `${months / 12} años`;
+  if (months > 12) return `${Number((months / 12).toFixed(1))} años`;
+  return `${months} meses`;
+};
+
+const parseGoalAmount = (input: string) => {
+  const normalized = input.toLowerCase();
+  if (!/(monto|vale|cuesta|valor|meta|mill[oó]n|millones|palos|pesos)/i.test(normalized)) {
+    return undefined;
+  }
+
+  const rawValue = normalized.match(/\d+(?:[.,]\d+)?/)?.[0];
+  if (!rawValue) return undefined;
+
+  const value = Number(rawValue.replace(',', '.'));
+  if (!value) return undefined;
+
+  if (/mill[oó]n|millones|palos/.test(normalized)) {
+    return Math.round(value * 1000000);
+  }
+
+  return Math.round(value);
+};
+
+const applyPostAnalysisAdjustment = (
+  input: string,
+  data: UserData & SavingsGoal
+) => {
+  const goalTimelineInMonths = parseTimelineInMonths(input);
+  const goalAmount = parseGoalAmount(input);
+
+  if (!goalTimelineInMonths && !goalAmount) {
+    return null;
+  }
+
+  return {
+    ...data,
+    ...(goalTimelineInMonths ? {
+      goalTimelineInMonths,
+      goalTimeline: formatTimeline(goalTimelineInMonths),
+    } : {}),
+    ...(goalAmount ? { goalAmount } : {}),
+  };
+};
+
 const buildAnalysis = (
   data: UserData & SavingsGoal,
   modelAnalysis?: Analysis
@@ -85,7 +132,7 @@ const getPostAnalysisMessage = (input: string) => {
     return '¡Con mucho gusto! Me alegra que te haya servido el análisis. Cuando quieras revisar otra meta, aquí estaré para ayudarte.';
   }
 
-  return 'Dejé el análisis anterior fijo para que puedas revisarlo con calma. Para cambiar plazo, monto o meta, lo mejor es iniciar un nuevo análisis desde cero.';
+  return 'Claro, lo seguimos revisando. Dime qué quieres ajustar: plazo, monto de la meta o gastos mensuales.';
 };
 
 const App: React.FC = () => {
@@ -122,6 +169,36 @@ const App: React.FC = () => {
     setMessages(prev => [...prev, userMessage]);
 
     if (analysis) {
+      const adjustedData = applyPostAnalysisAdjustment(userInput, { ...userData, ...savingsGoal });
+
+      if (adjustedData) {
+        const nextAnalysis = buildAnalysis(adjustedData);
+        const adjustmentMessage: Message = {
+          id: `${Date.now()}-bot`,
+          text: nextAnalysis
+            ? `¡Listo! Ajusté el análisis con ${adjustedData.goalTimeline ? `plazo de ${adjustedData.goalTimeline}` : 'los nuevos datos'}. Revisa cómo cambia el plan aquí abajo.`
+            : 'Listo, tomé el ajuste. Dame un dato más para recalcular bien el plan.',
+          sender: 'bot',
+          analysis: nextAnalysis || undefined,
+        };
+
+        setUserData({
+          name: adjustedData.name,
+          income: adjustedData.income,
+          expenses: adjustedData.expenses,
+        });
+        setSavingsGoal({
+          goalName: adjustedData.goalName,
+          goalAmount: adjustedData.goalAmount,
+          goalTimeline: adjustedData.goalTimeline,
+          goalStartDate: adjustedData.goalStartDate,
+          goalTimelineInMonths: adjustedData.goalTimelineInMonths,
+        });
+        setAnalysis(nextAnalysis);
+        setMessages(prev => [...prev, adjustmentMessage]);
+        return;
+      }
+
       const botMessage: Message = {
         id: `${Date.now()}-bot`,
         text: getPostAnalysisMessage(userInput),
