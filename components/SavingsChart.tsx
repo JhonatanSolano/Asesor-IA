@@ -13,7 +13,8 @@ const formatCOP = (value = 0) =>
     maximumFractionDigits: 0,
   }).format(value);
 
-const StatCard: React.FC<{ label: string; value: string; tone?: 'green' | 'amber' | 'blue' }> = ({
+const StatCard: React.FC<{ icon: string; label: string; value: string; tone?: 'green' | 'amber' | 'blue' }> = ({
+  icon,
   label,
   value,
   tone = 'blue',
@@ -26,7 +27,10 @@ const StatCard: React.FC<{ label: string; value: string; tone?: 'green' | 'amber
 
   return (
     <div className={`rounded-md border p-3 ${tones[tone]}`}>
-      <div className="text-xs font-semibold uppercase tracking-normal opacity-75">{label}</div>
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-normal opacity-75">
+        <span className="text-base" aria-hidden="true">{icon}</span>
+        <span>{label}</span>
+      </div>
       <div className="mt-1 text-lg font-bold leading-tight">{value}</div>
     </div>
   );
@@ -53,12 +57,14 @@ const SavingsChart: React.FC<SavingsChartProps> = ({ analysis }) => {
     <div className="space-y-4 text-gray-800">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatCard
+          icon="🐷"
           label="Puedes ahorrar"
           value={formatCOP(analysis.ahorroMensual)}
           tone={analysis.isViable ? 'green' : 'amber'}
         />
-        <StatCard label="Necesitas ahorrar" value={formatCOP(needed)} />
+        <StatCard icon="🎯" label="Necesitas ahorrar" value={formatCOP(needed)} />
         <StatCard
+          icon="🗓️"
           label="Plazo"
           value={`${analysis.goalTimelineInMonths ?? '-'} meses`}
           tone="blue"
@@ -105,7 +111,7 @@ const SavingsChart: React.FC<SavingsChartProps> = ({ analysis }) => {
         <ul className="space-y-2 text-sm text-gray-700">
           {analysis.sugerencias.map((suggestion) => (
             <li key={suggestion} className="flex gap-2">
-              <span className="mt-1 h-2 w-2 flex-none rounded-full bg-green-500" />
+              <span className="mt-0.5 flex-none" aria-hidden="true">✨</span>
               <span>{suggestion}</span>
             </li>
           ))}

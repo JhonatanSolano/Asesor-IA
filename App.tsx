@@ -51,8 +51,8 @@ const isTechnicalMessage = (message: Message) => {
 const parseTimelineInMonths = (timeline?: string) => {
   if (!timeline) return undefined;
 
-  const normalized = timeline.toLowerCase();
-  const value = Number(normalized.match(/\d+(?:[.,]\d+)?/)?.[0]?.replace(',', '.'));
+  const normalized = normalizeText(timeline);
+  const value = parseNumberValue(normalized);
   if (!value) return undefined;
 
   if (normalized.includes('año') || normalized.includes('ano')) {
@@ -60,6 +60,76 @@ const parseTimelineInMonths = (timeline?: string) => {
   }
 
   return Math.round(value);
+};
+
+const NUMBER_WORDS: Record<string, number> = {
+  un: 1,
+  uno: 1,
+  una: 1,
+  medio: 0.5,
+  media: 0.5,
+  dos: 2,
+  tres: 3,
+  cuatro: 4,
+  cinco: 5,
+  seis: 6,
+  siete: 7,
+  ocho: 8,
+  nueve: 9,
+  diez: 10,
+  once: 11,
+  doce: 12,
+  trece: 13,
+  catorce: 14,
+  quince: 15,
+  dieciseis: 16,
+  diecisiete: 17,
+  dieciocho: 18,
+  diecinueve: 19,
+  veinte: 20,
+  veintiuno: 21,
+  veintidos: 22,
+  veintitres: 23,
+  veinticuatro: 24,
+  veinticinco: 25,
+  veintiseis: 26,
+  veintisiete: 27,
+  veintiocho: 28,
+  veintinueve: 29,
+  treinta: 30,
+  cuarenta: 40,
+  cincuenta: 50,
+  sesenta: 60,
+};
+
+const parseNumberWords = (input: string) => {
+  const words = normalizeText(input).split(/\s+/);
+  let total = 0;
+  let found = false;
+
+  for (let i = 0; i < words.length; i += 1) {
+    const current = words[i];
+    const next = words[i + 1];
+
+    if (NUMBER_WORDS[current]) {
+      found = true;
+      total += NUMBER_WORDS[current];
+      continue;
+    }
+
+    if (current === 'y' && next && NUMBER_WORDS[next] && (total >= 20 || next === 'medio' || next === 'media')) {
+      total += NUMBER_WORDS[next];
+      i += 1;
+    }
+  }
+
+  return found ? total : undefined;
+};
+
+const parseNumberValue = (input: string) => {
+  const normalized = normalizeText(input);
+  const numericValue = Number(normalized.match(/\d+(?:[.,]\d+)?/)?.[0]?.replace(',', '.'));
+  return numericValue || parseNumberWords(normalized);
 };
 
 const formatTimeline = (months?: number) => {
@@ -70,14 +140,11 @@ const formatTimeline = (months?: number) => {
 };
 
 const parseMoneyAmount = (input: string) => {
-  const normalized = input.toLowerCase();
-  const rawValue = normalized.match(/\d+(?:[.,]\d+)?/)?.[0];
-  if (!rawValue) return undefined;
-
-  const value = Number(rawValue.replace(',', '.'));
+  const normalized = normalizeText(input);
+  const value = parseNumberValue(normalized);
   if (!value) return undefined;
 
-  if (/mill[oó]n|millones|palos/.test(normalized)) {
+  if (/millon|millones|palos/.test(normalized)) {
     return Math.round(value * 1000000);
   }
 
@@ -85,7 +152,7 @@ const parseMoneyAmount = (input: string) => {
 };
 
 const parseGoalAmount = (input: string) => {
-  if (!/(monto|vale|cuesta|valor|meta|mill[oó]n|millones|palos|pesos)/i.test(input.toLowerCase())) {
+  if (!/(monto|vale|cuesta|valor|meta|millon|millones|palos|pesos)/i.test(normalizeText(input))) {
     return undefined;
   }
 
