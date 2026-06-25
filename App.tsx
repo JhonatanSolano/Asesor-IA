@@ -15,7 +15,6 @@ type StoredChatState = {
   savingsGoal: SavingsGoal;
   analysis: Analysis | null;
   planData: (UserData & SavingsGoal) | null;
-  chatClosed: boolean;
 };
 
 const initialBotMessage: Message = {
@@ -328,7 +327,6 @@ const App: React.FC = () => {
   const [savingsGoal, setSavingsGoal] = useState<SavingsGoal>(storedChatRef.current?.savingsGoal || {});
   const [analysis, setAnalysis] = useState<Analysis | null>(storedChatRef.current?.analysis || null);
   const [planData, setPlanData] = useState<(UserData & SavingsGoal) | null>(storedChatRef.current?.planData || null);
-  const [chatClosed, setChatClosed] = useState<boolean>(storedChatRef.current?.chatClosed || false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -346,10 +344,9 @@ const App: React.FC = () => {
       savingsGoal,
       analysis,
       planData,
-      chatClosed,
     };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToStore));
-  }, [messages, userData, savingsGoal, analysis, planData, chatClosed]);
+  }, [messages, userData, savingsGoal, analysis, planData]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -365,24 +362,13 @@ const App: React.FC = () => {
     };
     setMessages(prev => [...prev, userMessage]);
 
-    if (chatClosed) {
-      const botMessage: Message = {
-        id: `${Date.now()}-bot`,
-        text: 'Ya dejamos este análisis cerrado. Si quieres revisar otra meta, podemos empezar una nueva conversación cuando quieras.',
-        sender: 'bot',
-      };
-      setMessages(prev => [...prev, botMessage]);
-      return;
-    }
-
     if (analysis) {
       if (isClosingThanks(userInput)) {
         const botMessage: Message = {
           id: `${Date.now()}-bot`,
-          text: '¡Con mucho gusto! Me alegra que te haya servido el análisis. Que te vaya muy bien con esa meta; cuando quieras revisar otra, aquí estaré.',
+          text: '¡Con mucho gusto! Me alegra que te haya servido el análisis. Si más adelante quieres ajustar algo o revisar otra meta, aquí sigo para ayudarte.',
           sender: 'bot',
         };
-        setChatClosed(true);
         setMessages(prev => [...prev, botMessage]);
         return;
       }
