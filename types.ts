@@ -10,6 +10,7 @@ export interface UserData {
   name?: string;
   income?: number;
   expenses?: number;
+  monthlyAvailable?: number;
 }
 
 export interface SavingsGoal {

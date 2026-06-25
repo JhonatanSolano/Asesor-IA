@@ -110,6 +110,7 @@ const hydratePlanData = (
     ...data,
     income: income || (expenses && monthlyAvailable ? expenses + monthlyAvailable : undefined),
     expenses: expenses || (income && monthlyAvailable ? income - monthlyAvailable : undefined),
+    monthlyAvailable,
     goalAmount,
     goalTimelineInMonths,
     goalTimeline: data.goalTimeline || formatTimeline(goalTimelineInMonths),
@@ -118,8 +119,9 @@ const hydratePlanData = (
 
 const getMissingPlanFields = (data: UserData & SavingsGoal) => {
   const missing: string[] = [];
-  if (!Number(data.income)) missing.push('ingresos mensuales');
-  if (Number.isNaN(Number(data.expenses)) || data.expenses === undefined) missing.push('gastos mensuales');
+  const hasMonthlyAvailable = Number(data.monthlyAvailable) > 0;
+  if (!hasMonthlyAvailable && !Number(data.income)) missing.push('ingresos mensuales');
+  if (!hasMonthlyAvailable && (Number.isNaN(Number(data.expenses)) || data.expenses === undefined)) missing.push('gastos mensuales');
   if (!Number(data.goalAmount)) missing.push('monto de la meta');
   if (!Number(data.goalTimelineInMonths) && !parseTimelineInMonths(data.goalTimeline)) missing.push('plazo');
   return missing;
@@ -131,14 +133,15 @@ const buildAnalysis = (
 ): Analysis | null => {
   const income = Number(data.income);
   const expenses = Number(data.expenses);
+  const savedMonthlyAvailable = Number(data.monthlyAvailable);
   const goalAmount = Number(data.goalAmount);
   const goalTimelineInMonths = Number(data.goalTimelineInMonths) || parseTimelineInMonths(data.goalTimeline);
+  const monthlyAvailable = savedMonthlyAvailable || (income && !Number.isNaN(expenses) ? income - expenses : undefined);
 
-  if (!income || !goalAmount || !goalTimelineInMonths || Number.isNaN(expenses)) {
+  if (!monthlyAvailable || !goalAmount || !goalTimelineInMonths) {
     return modelAnalysis || null;
   }
 
-  const monthlyAvailable = income - expenses;
   const ahorroMensual = Math.max(monthlyAvailable * 0.2, 0);
   const ahorroNecesarioMensual = goalAmount / goalTimelineInMonths;
   const progresoPorcentaje = ahorroNecesarioMensual > 0
@@ -173,8 +176,22 @@ const isClosingThanks = (input: string) =>
   /^(gracias|gracias[,. ]+ya|listo|ok|bueno|entendido|ya entend[ií])\b/i.test(input.trim());
 
 const getPostAnalysisMessage = (input: string) => {
+  const normalized = input.toLowerCase();
+
   if (isClosingThanks(input)) {
     return '¡Con mucho gusto! Me alegra que te haya servido el análisis. Cuando quieras revisar otra meta, aquí estaré para ayudarte.';
+  }
+
+  if (normalized.includes('plazo') || normalized.includes('tiempo')) {
+    return 'Claro, ajustamos el plazo. Dime el nuevo tiempo completo, por ejemplo: "en 8 meses", "a 2.5 años" o "en 30 meses".';
+  }
+
+  if (normalized.includes('monto') || normalized.includes('meta') || normalized.includes('valor')) {
+    return 'Listo, ajustamos el monto. Dime el nuevo valor completo, por ejemplo: "la meta ahora vale 4 millones".';
+  }
+
+  if (normalized.includes('gasto') || normalized.includes('ingreso')) {
+    return 'Listo, ajustamos tus datos mensuales. Dime el nuevo valor completo, por ejemplo: "mis gastos son 2.5 millones".';
   }
 
   return 'Claro, lo seguimos revisando. Dime qué quieres ajustar: plazo, monto de la meta o gastos mensuales.';
@@ -235,6 +252,7 @@ const App: React.FC = () => {
           name: completeAdjustedData.name,
           income: completeAdjustedData.income,
           expenses: completeAdjustedData.expenses,
+          monthlyAvailable: completeAdjustedData.monthlyAvailable,
         });
         setSavingsGoal({
           goalName: completeAdjustedData.goalName,
