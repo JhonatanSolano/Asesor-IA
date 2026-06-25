@@ -7,32 +7,10 @@ import UserInput from './components/UserInput';
 import SavingsChart from './components/SavingsChart';
 import Spinner from './components/Spinner';
 
-const STORAGE_KEY = 'asesor-ia-chat-state';
-
-type StoredChatState = {
-  messages: Message[];
-  userData: UserData;
-  savingsGoal: SavingsGoal;
-  analysis: Analysis | null;
-  planData: (UserData & SavingsGoal) | null;
-};
-
 const initialBotMessage: Message = {
   id: 'initial-bot-message',
   text: "¡Qué más, parce! Soy Asesor-IA, tu Pana Financiero 🚀. Estoy aquí para ayudarte a organizar tus finanzas y alcanzar tus metas de ahorro. ¿Cómo te llamas?",
   sender: 'bot'
-};
-
-const loadStoredChat = (): StoredChatState | null => {
-  if (typeof window === 'undefined') return null;
-
-  try {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : null;
-  } catch (error) {
-    console.error('No se pudo cargar la conversación guardada.', error);
-    return null;
-  }
 };
 
 const isTechnicalMessage = (message: Message) => {
@@ -359,32 +337,19 @@ const getPostAnalysisMessage = (input: string) => {
 };
 
 const App: React.FC = () => {
-  const storedChatRef = useRef<StoredChatState | null>(loadStoredChat());
-  const [messages, setMessages] = useState<Message[]>(storedChatRef.current?.messages || [initialBotMessage]);
-  const [userData, setUserData] = useState<UserData>(storedChatRef.current?.userData || {});
-  const [savingsGoal, setSavingsGoal] = useState<SavingsGoal>(storedChatRef.current?.savingsGoal || {});
-  const [analysis, setAnalysis] = useState<Analysis | null>(storedChatRef.current?.analysis || null);
-  const [planData, setPlanData] = useState<(UserData & SavingsGoal) | null>(storedChatRef.current?.planData || null);
+  const [messages, setMessages] = useState<Message[]>([initialBotMessage]);
+  const [userData, setUserData] = useState<UserData>({});
+  const [savingsGoal, setSavingsGoal] = useState<SavingsGoal>({});
+  const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [planData, setPlanData] = useState<(UserData & SavingsGoal) | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    window.localStorage.removeItem('asesor-ia-chat-state');
     setIsLoading(false);
   }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const stateToStore: StoredChatState = {
-      messages,
-      userData,
-      savingsGoal,
-      analysis,
-      planData,
-    };
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToStore));
-  }, [messages, userData, savingsGoal, analysis, planData]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
