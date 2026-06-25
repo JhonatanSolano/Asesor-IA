@@ -69,6 +69,17 @@ const buildAnalysis = (
   };
 };
 
+const getFinalMessage = (analysis: Analysis) => {
+  if (analysis.isViable) {
+    return '¡Listo! Ya tengo tu análisis completo. La meta se ve alcanzable con tu capacidad de ahorro actual; mira el resumen visual aquí abajo.';
+  }
+
+  return '¡Listo! Ya tengo tu análisis completo. La meta necesita algunos ajustes, pero aquí abajo ves exactamente qué mover para acercarte.';
+};
+
+const isClosingThanks = (input: string) =>
+  /^(gracias|gracias[,. ]+ya|listo|ok|bueno|entendido|ya entend[ií])\b/i.test(input.trim());
+
 const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [userData, setUserData] = useState<UserData>({});
@@ -101,8 +112,18 @@ const App: React.FC = () => {
       sender: 'user',
     };
     setMessages(prev => [...prev, userMessage]);
+
+    if (analysis && isClosingThanks(userInput)) {
+      const botMessage: Message = {
+        id: `${Date.now()}-bot`,
+        text: '¡Con mucho gusto! Cuando quieras ajustar el plazo, el monto o revisar otra meta, aquí estoy para ayudarte.',
+        sender: 'bot',
+      };
+      setMessages(prev => [...prev, botMessage]);
+      return;
+    }
+
     setIsLoading(true);
-    setAnalysis(null);
 
     try {
       const history: ChatHistoryContent[] = messages
@@ -115,9 +136,15 @@ const App: React.FC = () => {
       const response = await generateBotResponse(history, userInput, { ...userData, ...savingsGoal });
       
       if (response) {
+        const combinedData = { ...userData, ...savingsGoal, ...response.updatedData };
+        const nextAnalysis = buildAnalysis(combinedData, response.analysis);
+        const shouldCloseAnalysis = response.action === "END" || Boolean(nextAnalysis);
+        const botText = shouldCloseAnalysis && nextAnalysis
+          ? getFinalMessage(nextAnalysis)
+          : response.responseText;
         const botMessage: Message = {
           id: `${Date.now()}-bot`,
-          text: response.responseText,
+          text: botText,
           sender: 'bot',
         };
         setMessages(prev => [...prev, botMessage]);
@@ -126,9 +153,8 @@ const App: React.FC = () => {
             setUserData(prev => ({...prev, ...response.updatedData}));
             setSavingsGoal(prev => ({...prev, ...response.updatedData}));
         }
-        if (response.action === "END") {
-            const combinedData = { ...userData, ...savingsGoal, ...response.updatedData };
-            setAnalysis(buildAnalysis(combinedData, response.analysis));
+        if (shouldCloseAnalysis) {
+            setAnalysis(nextAnalysis);
         }
       } else {
         throw new Error("Invalid response from API");
