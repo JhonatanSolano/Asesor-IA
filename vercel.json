@@ -12,6 +12,8 @@
     }
   ],
   "routes": [
+    { "src": "/api/generate", "dest": "/api/generate.ts" },
+    { "src": "/api/health", "dest": "/api/health.ts" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
   ],
