@@ -34,9 +34,8 @@ const modePrompts: Record<TutorMode, string> = {
 const initialBotMessage: Message = {
   id: 'initial-bot-message',
   text:
-    'Hola. Soy tu tutor de matemáticas para admisión UNAL e ICFES Saber 11. Te puedo ayudar a resolver preguntas, practicar por tema y preparar una ruta de estudio.\n\n¿Qué quieres hacer?',
+    'Hola. Soy tu tutor de matemáticas para admisión UNAL e ICFES Saber 11. Escríbeme una pregunta, un tema para practicar o pega un ejercicio que quieras resolver.',
   sender: 'bot',
-  quickReplies: modeQuickReplies,
 };
 
 const topicCards = [
@@ -111,20 +110,13 @@ const App: React.FC = () => {
     }
   }, [messages, isChatOpen]);
 
-  const addBotMessage = (text: string, quickReplies: QuickReply[] = modeQuickReplies) => {
+  const addBotMessage = (text: string) => {
     const botMessage: Message = {
       id: `${Date.now()}-bot`,
       text,
       sender: 'bot',
-      quickReplies,
     };
     setMessages(prev => [...prev, botMessage]);
-  };
-
-  const startMode = (mode: TutorMode) => {
-    setIsChatOpen(true);
-    setActiveMode(mode);
-    addBotMessage(modePrompts[mode]);
   };
 
   const handleUserInput = async (userInput: string) => {
@@ -165,7 +157,6 @@ const App: React.FC = () => {
         id: `${Date.now()}-bot`,
         text: response.responseText,
         sender: 'bot',
-        quickReplies: modeQuickReplies,
       };
       setMessages(prev => [...prev, botMessage]);
     } catch (error) {
@@ -187,13 +178,6 @@ const App: React.FC = () => {
               <h1 className="text-lg font-bold text-slate-950">Admisión UNAL e ICFES Saber 11</h1>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setIsChatOpen(true)}
-            className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
-          >
-            Abrir tutor
-          </button>
         </div>
       </header>
 
@@ -207,22 +191,6 @@ const App: React.FC = () => {
             <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-700">
               Practica preguntas tipo admisión UNAL e ICFES Saber 11, revisa errores y recibe explicaciones paso a paso sin perderte en teoría innecesaria.
             </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => startMode('solve')}
-                className="rounded-full bg-slate-950 px-5 py-3 font-semibold text-white transition hover:bg-slate-800"
-              >
-                Resolver una pregunta
-              </button>
-              <button
-                type="button"
-                onClick={() => startMode('practice')}
-                className="rounded-full border border-slate-300 bg-white px-5 py-3 font-semibold text-slate-900 transition hover:border-emerald-500"
-              >
-                Practicar por tema
-              </button>
-            </div>
           </div>
 
           <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-lg">
@@ -276,7 +244,7 @@ const App: React.FC = () => {
       <button
         type="button"
         onClick={() => setIsChatOpen(prev => !prev)}
-        className="fixed bottom-5 right-5 z-40 flex h-16 w-16 items-center justify-center rounded-full bg-slate-950 text-3xl font-black text-white shadow-2xl transition hover:scale-105 hover:bg-emerald-700"
+        className="fixed bottom-5 right-5 z-40 flex h-16 w-16 items-center justify-center rounded-full bg-slate-950 text-3xl font-black text-white shadow-[0_0_0_6px_rgba(16,185,129,0.16),0_18px_35px_rgba(15,23,42,0.30)] transition duration-200 hover:scale-125 hover:bg-emerald-700 hover:shadow-[0_0_0_10px_rgba(16,185,129,0.22),0_22px_45px_rgba(16,185,129,0.35)]"
         aria-label="Abrir chat de tutor"
       >
         ∑
