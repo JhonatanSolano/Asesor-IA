@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Message, UserData, SavingsGoal, Analysis, ChatHistoryContent } from './types';
+import { Message, UserData, SavingsGoal, Analysis, ChatHistoryContent, QuickReply } from './types';
 import { generateBotResponse } from './services/geminiService';
 import ChatMessage from './components/ChatMessage';
 import UserInput from './components/UserInput';
@@ -234,12 +234,15 @@ const extractPlanDataFromInput = (input: string): Partial<UserData & SavingsGoal
 type AdjustmentMode = 'extraIncome' | 'timeline' | 'expenses' | 'goalAmount';
 
 const getAdjustmentMenu = () =>
-  '¿Quieres ajustar algo más?\n\n' +
-  '1. Sumar ingreso extra 💼\n' +
-  '2. Cambiar plazo 🗓️\n' +
-  '3. Cambiar gastos mensuales 💸\n' +
-  '4. Cambiar monto de la meta 🎯\n' +
-  '5. Estoy satisfecho ✅';
+  '¿Quieres ajustar algo más? Puedes tocar una opción o escribirme el cambio con tus palabras.';
+
+const adjustmentQuickReplies: QuickReply[] = [
+  { label: '💼 Sumar ingreso extra', value: 'Sumar ingreso extra' },
+  { label: '🗓️ Cambiar plazo', value: 'Cambiar plazo' },
+  { label: '💸 Sumar gastos', value: 'Cambiar gastos mensuales' },
+  { label: '🎯 Cambiar meta', value: 'Cambiar monto de la meta' },
+  { label: '✅ Estoy satisfecho', value: 'Estoy satisfecho' },
+];
 
 const getAdjustmentModeFromInput = (input: string): AdjustmentMode | 'done' | null => {
   const normalized = normalizeText(input);
@@ -341,6 +344,18 @@ const hydratePlanData = (
   };
 };
 
+const calculateMonthlyAvailable = (data: UserData & SavingsGoal) => {
+  const income = Number(data.income);
+  const expenses = Number(data.expenses);
+
+  if (Number.isFinite(income) && income > 0 && Number.isFinite(expenses)) {
+    return income - expenses;
+  }
+
+  const savedMonthlyAvailable = Number(data.monthlyAvailable);
+  return Number.isFinite(savedMonthlyAvailable) ? savedMonthlyAvailable : undefined;
+};
+
 const getMissingPlanFields = (data: UserData & SavingsGoal) => {
   const missing: string[] = [];
   const hasMonthlyAvailable = Number(data.monthlyAvailable) > 0;
@@ -355,14 +370,11 @@ const buildAnalysis = (
   data: UserData & SavingsGoal,
   modelAnalysis?: Analysis
 ): Analysis | null => {
-  const income = Number(data.income);
-  const expenses = Number(data.expenses);
-  const savedMonthlyAvailable = Number(data.monthlyAvailable);
   const goalAmount = Number(data.goalAmount);
   const goalTimelineInMonths = Number(data.goalTimelineInMonths) || parseTimelineInMonths(data.goalTimeline);
-  const monthlyAvailable = savedMonthlyAvailable || (income && !Number.isNaN(expenses) ? income - expenses : undefined);
+  const monthlyAvailable = calculateMonthlyAvailable(data);
 
-  if (!monthlyAvailable || !goalAmount || !goalTimelineInMonths) {
+  if (monthlyAvailable === undefined || !goalAmount || !goalTimelineInMonths) {
     return modelAnalysis || null;
   }
 
@@ -652,6 +664,7 @@ const App: React.FC = () => {
               : `Listo, tomé el ajuste. Para recalcular bien me falta: ${missingFields.join(', ')}.`,
             sender: 'bot',
             analysis: nextAnalysis || undefined,
+            quickReplies: nextAnalysis ? adjustmentQuickReplies : undefined,
           };
 
           setAdjustmentMode(null);
@@ -690,6 +703,7 @@ const App: React.FC = () => {
             : `Listo, tomé el ajuste. Para recalcular bien me falta: ${missingFields.join(', ')}.`,
           sender: 'bot',
           analysis: nextAnalysis || undefined,
+          quickReplies: nextAnalysis ? adjustmentQuickReplies : undefined,
         };
 
         setUserData({
@@ -717,6 +731,7 @@ const App: React.FC = () => {
         id: `${Date.now()}-bot`,
         text: getPostAnalysisMessage(userInput),
         sender: 'bot',
+        quickReplies: adjustmentQuickReplies,
       };
       setMessages(prev => [...prev, botMessage]);
       return;
@@ -747,6 +762,7 @@ const App: React.FC = () => {
           text: botText,
           sender: 'bot',
           analysis: shouldCloseAnalysis && nextAnalysis ? nextAnalysis : undefined,
+          quickReplies: shouldCloseAnalysis && nextAnalysis ? adjustmentQuickReplies : undefined,
         };
         setMessages(prev => [...prev, botMessage]);
 
@@ -787,7 +803,11 @@ const App: React.FC = () => {
       <main className="flex-1 bg-white rounded-lg shadow-xl p-4 overflow-y-auto flex flex-col space-y-4">
         {messages.map((msg) => (
           <React.Fragment key={msg.id}>
-            <ChatMessage message={msg} />
+            <ChatMessage
+              message={msg}
+              onQuickReply={handleUserInput}
+              quickRepliesDisabled={isLoading}
+            />
             {msg.analysis && (
               <div className="bg-gray-50 rounded-lg p-4 shadow-inner">
                 <h3 className="text-xl font-bold text-center mb-2 text-green-700">¡Análisis de tu Meta! 🚀</h3>

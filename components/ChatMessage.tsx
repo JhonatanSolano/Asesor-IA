@@ -6,9 +6,11 @@ import { Message } from '../types';
 
 interface ChatMessageProps {
   message: Message;
+  onQuickReply?: (value: string) => void;
+  quickRepliesDisabled?: boolean;
 }
 
-const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
+const ChatMessage: React.FC<ChatMessageProps> = ({ message, onQuickReply, quickRepliesDisabled }) => {
   const isBot = message.sender === 'bot';
 
   const containerClasses = `flex items-start gap-3 ${isBot ? '' : 'flex-row-reverse'}`;
@@ -32,6 +34,21 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
          >
             {message.text}
         </ReactMarkdown>
+        {message.quickReplies?.length ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {message.quickReplies.map(reply => (
+              <button
+                key={reply.value}
+                type="button"
+                disabled={quickRepliesDisabled}
+                onClick={() => onQuickReply?.(reply.value)}
+                className="rounded-full bg-white/95 px-3 py-2 text-sm font-semibold text-green-700 shadow-sm transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {reply.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
     </div>
   );

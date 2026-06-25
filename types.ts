@@ -4,6 +4,12 @@ export interface Message {
   text: string;
   sender: 'user' | 'bot';
   analysis?: Analysis;
+  quickReplies?: QuickReply[];
+}
+
+export interface QuickReply {
+  label: string;
+  value: string;
 }
 
 export interface UserData {
