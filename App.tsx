@@ -143,7 +143,7 @@ const parseMoneyValueFromText = (input: string) => {
 const parseMoneyNearKeywords = (input: string, keywords: string[]) => {
   const normalized = normalizeText(input);
   const words = normalized.split(/\s+/);
-  const keywordIndex = words.findIndex(word => keywords.some(keyword => word.includes(keyword)));
+  const keywordIndex = words.findIndex(word => keywords.some(keyword => word === keyword || word.startsWith(keyword)));
 
   if (keywordIndex < 0) return undefined;
 
@@ -154,13 +154,15 @@ const parseMoneyNearKeywords = (input: string, keywords: string[]) => {
 
 const parseExtraIncomeAmount = (input: string) => {
   const normalized = normalizeText(input);
-  if (!/(extra|adicional|mas|gano mas|ingreso extra)/.test(normalized)) return undefined;
+  if (!/(extra|adicional|\bmas\b|gano .*mas|ingreso extra)/.test(normalized)) return undefined;
 
   const beforeExtra = normalized.match(/(\d+(?:[.,]\d+)?\s*(?:m|millones?|palos?|pesos?)?)\s*(?:extra|adicional)\b/);
   const afterExtra = normalized.match(/(?:extra|adicional)(?:\s+de)?\s+(\d+(?:[.,]\d+)?\s*(?:m|millones?|palos?|pesos?)?)/);
+  const afterIncome = normalized.match(/(?:gano|ingreso|ingresos|salario)(?:\s+\w+){0,4}?\s+(\d+(?:[.,]\d+)?\s*(?:m|millones?|palos?|pesos?)?)(?:\s+\w+){0,3}?\s+(?:mas|extra|adicional)/);
 
   return (beforeExtra ? parseMoneyValueFromText(beforeExtra[1]) : undefined)
     || (afterExtra ? parseMoneyValueFromText(afterExtra[1]) : undefined)
+    || (afterIncome ? parseMoneyValueFromText(afterIncome[1]) : undefined)
     || parseMoneyNearKeywords(input, ['extra', 'adicional'])
     || parseMoneyValueFromText(input);
 };
@@ -198,12 +200,14 @@ const parseMonthlyAvailableAmount = (input: string) => {
 
 const parseExpenseChange = (input: string) => {
   const normalized = normalizeText(input);
+  if (!/\b(gasto|gastos|egreso|egresos|arriendo|mercado)\b/.test(normalized)) return null;
+
   const amount = parseMoneyNearKeywords(input, ['gasto', 'gastos', 'egreso', 'arriendo', 'mercado'])
-    || parseMoneyValueFromText(input);
+    || parseMoneyNearKeywords(input, ['egresos']);
 
   if (!amount) return null;
 
-  const isDecrease = /(gasto|gastos|egreso|arriendo|mercado).{0,40}(menos|baj|reduzc|reduje|redujo|disminu)|menos.{0,40}(gasto|gastos|egreso|arriendo|mercado)/.test(normalized);
+  const isDecrease = /\b(gasto|gastos|egreso|egresos|arriendo|mercado)\b.{0,60}\b(menos|baj|reduzc|reduje|redujo|disminu)|\b(menos|baj|reduzc|reduje|redujo|disminu)\b.{0,60}\b(gasto|gastos|egreso|egresos|arriendo|mercado)\b/.test(normalized);
   return {
     amount,
     operation: isDecrease ? 'decrease' as const : 'increase' as const,
@@ -241,9 +245,9 @@ const getAdjustmentModeFromInput = (input: string): AdjustmentMode | 'done' | nu
   const normalized = normalizeText(input);
 
   if (/^(5|cinco)\b/.test(normalized) || isClosingThanks(input)) return 'done';
-  if (/^(1|uno)\b/.test(normalized) || /(ingreso extra|extra|adicional|gano mas|otra entrada|rebusque)/.test(normalized)) return 'extraIncome';
-  if (/^(2|dos)\b/.test(normalized) || /(plazo|tiempo|meses|anos|ano|anios|años)/.test(normalized)) return 'timeline';
-  if (/^(3|tres)\b/.test(normalized) || /(gasto|gastos|egreso|arriendo|mercado)/.test(normalized)) return 'expenses';
+  if (/^(1|uno)\b/.test(normalized) || /(ingreso extra|extra|adicional|gano .*mas|otra entrada|rebusque)/.test(normalized)) return 'extraIncome';
+  if (/^(2|dos)\b/.test(normalized) || /\b(plazo|tiempo|meses|mes|anos|ano|anios|años)\b/.test(normalized)) return 'timeline';
+  if (/^(3|tres)\b/.test(normalized) || /\b(gasto|gastos|egreso|egresos|arriendo|mercado)\b/.test(normalized)) return 'expenses';
   if (/^(4|cuatro)\b/.test(normalized) || /(monto|valor|cuesta|vale|meta)/.test(normalized)) return 'goalAmount';
 
   return null;
@@ -580,7 +584,13 @@ const App: React.FC = () => {
         }
 
         if (selectedMode === 'expenses') {
-          const expenseChange = parseExpenseChange(userInput);
+          const parsedExpenseChange = parseExpenseChange(userInput);
+          const expenseChange = parsedExpenseChange || (adjustmentMode === 'expenses' && parseMoneyAmount(userInput)
+            ? {
+              amount: parseMoneyAmount(userInput) as number,
+              operation: normalizeText(userInput).includes('menos') ? 'decrease' as const : 'increase' as const,
+            }
+            : null);
 
           if (!expenseChange) {
             setAdjustmentMode('expenses');
