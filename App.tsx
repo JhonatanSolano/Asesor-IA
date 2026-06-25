@@ -7,6 +7,35 @@ import UserInput from './components/UserInput';
 import SavingsChart from './components/SavingsChart';
 import Spinner from './components/Spinner';
 
+const STORAGE_KEY = 'asesor-ia-chat-state';
+
+type StoredChatState = {
+  messages: Message[];
+  userData: UserData;
+  savingsGoal: SavingsGoal;
+  analysis: Analysis | null;
+  planData: (UserData & SavingsGoal) | null;
+  chatClosed: boolean;
+};
+
+const initialBotMessage: Message = {
+  id: 'initial-bot-message',
+  text: "¡Qué más, parce! Soy Asesor-IA, tu Pana Financiero 🚀. Estoy aquí para ayudarte a organizar tus finanzas y alcanzar tus metas de ahorro. ¿Cómo te llamas?",
+  sender: 'bot'
+};
+
+const loadStoredChat = (): StoredChatState | null => {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    return stored ? JSON.parse(stored) : null;
+  } catch (error) {
+    console.error('No se pudo cargar la conversación guardada.', error);
+    return null;
+  }
+};
+
 const isTechnicalMessage = (message: Message) => {
   if (message.sender !== 'bot') return false;
 
@@ -172,8 +201,36 @@ const getFinalMessage = (analysis: Analysis) => {
   return '¡Listo! Ya tengo tu análisis completo. La meta necesita algunos ajustes, pero aquí abajo ves exactamente qué mover para acercarte.';
 };
 
-const isClosingThanks = (input: string) =>
-  /^(gracias|gracias[,. ]+ya|listo|ok|bueno|entendido|ya entend[ií])\b/i.test(input.trim());
+const normalizeText = (input: string) =>
+  input
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+
+const isClosingThanks = (input: string) => {
+  const normalized = normalizeText(input);
+
+  return [
+    /^vale[,\s]+gracias\b/,
+    /^gracias\b/,
+    /^muchas gracias\b/,
+    /^listo\b/,
+    /^ok\b/,
+    /^bueno\b/,
+    /^entendido\b/,
+    /^ya entendi\b/,
+    /^nada mas\b/,
+    /^eso es todo\b/,
+    /^eso era todo\b/,
+    /^terminamos\b/,
+    /^finalicemos\b/,
+    /^cerrar\b/,
+    /^chao\b/,
+    /^bye\b/,
+    /^hasta luego\b/,
+  ].some(pattern => pattern.test(normalized));
+};
 
 const getPostAnalysisMessage = (input: string) => {
   const normalized = input.toLowerCase();
@@ -198,24 +255,34 @@ const getPostAnalysisMessage = (input: string) => {
 };
 
 const App: React.FC = () => {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [userData, setUserData] = useState<UserData>({});
-  const [savingsGoal, setSavingsGoal] = useState<SavingsGoal>({});
-  const [analysis, setAnalysis] = useState<Analysis | null>(null);
-  const [planData, setPlanData] = useState<(UserData & SavingsGoal) | null>(null);
+  const storedChatRef = useRef<StoredChatState | null>(loadStoredChat());
+  const [messages, setMessages] = useState<Message[]>(storedChatRef.current?.messages || [initialBotMessage]);
+  const [userData, setUserData] = useState<UserData>(storedChatRef.current?.userData || {});
+  const [savingsGoal, setSavingsGoal] = useState<SavingsGoal>(storedChatRef.current?.savingsGoal || {});
+  const [analysis, setAnalysis] = useState<Analysis | null>(storedChatRef.current?.analysis || null);
+  const [planData, setPlanData] = useState<(UserData & SavingsGoal) | null>(storedChatRef.current?.planData || null);
+  const [chatClosed, setChatClosed] = useState<boolean>(storedChatRef.current?.chatClosed || false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const initialMessage: Message = {
-      id: Date.now().toString(),
-      text: "¡Qué más, parce! Soy Asesor-IA, tu Pana Financiero 🚀. Estoy aquí para ayudarte a organizar tus finanzas y alcanzar tus metas de ahorro. ¿Cómo te llamas?",
-      sender: 'bot'
-    };
-    setMessages([initialMessage]);
     setIsLoading(false);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const stateToStore: StoredChatState = {
+      messages,
+      userData,
+      savingsGoal,
+      analysis,
+      planData,
+      chatClosed,
+    };
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToStore));
+  }, [messages, userData, savingsGoal, analysis, planData, chatClosed]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -231,7 +298,28 @@ const App: React.FC = () => {
     };
     setMessages(prev => [...prev, userMessage]);
 
+    if (chatClosed) {
+      const botMessage: Message = {
+        id: `${Date.now()}-bot`,
+        text: 'Ya dejamos este análisis cerrado. Si quieres revisar otra meta, podemos empezar una nueva conversación cuando quieras.',
+        sender: 'bot',
+      };
+      setMessages(prev => [...prev, botMessage]);
+      return;
+    }
+
     if (analysis) {
+      if (isClosingThanks(userInput)) {
+        const botMessage: Message = {
+          id: `${Date.now()}-bot`,
+          text: '¡Con mucho gusto! Me alegra que te haya servido el análisis. Que te vaya muy bien con esa meta; cuando quieras revisar otra, aquí estaré.',
+          sender: 'bot',
+        };
+        setChatClosed(true);
+        setMessages(prev => [...prev, botMessage]);
+        return;
+      }
+
       const basePlan = planData || hydratePlanData({ ...userData, ...savingsGoal }, analysis);
       const adjustedData = applyPostAnalysisAdjustment(userInput, basePlan);
 
