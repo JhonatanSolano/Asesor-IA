@@ -150,6 +150,14 @@ const parseMoneyNearKeywords = (input: string, keywords: string[]) => {
   return parseMoneyValueFromText(after) || parseMoneyValueFromText(before);
 };
 
+const parseExtraIncomeAmount = (input: string) => {
+  const normalized = normalizeText(input);
+  if (!/(extra|adicional|mas|gano mas|ingreso extra)/.test(normalized)) return undefined;
+
+  return parseMoneyNearKeywords(input, ['extra', 'adicional'])
+    || parseMoneyValueFromText(input);
+};
+
 const formatTimeline = (months?: number) => {
   if (!months) return 'el nuevo plazo';
   if (months % 12 === 0) return `${months / 12} años`;
@@ -179,9 +187,7 @@ const applyPostAnalysisAdjustment = (
   const goalTimelineInMonths = parseTimelineInMonths(input);
   const goalAmount = parseGoalAmount(input);
   const income = parseMoneyNearKeywords(input, ['ingreso', 'ingresos', 'gano', 'gana', 'salario', 'mensualidad']);
-  const extraIncome = /extra|adicional|mas/.test(normalizeText(input))
-    ? parseMoneyNearKeywords(input, ['extra', 'adicional'])
-    : undefined;
+  const extraIncome = parseExtraIncomeAmount(input);
   const expenses = parseMoneyNearKeywords(input, ['gasto', 'gastos', 'egreso', 'arriendo', 'mercado']);
 
   if (!goalTimelineInMonths && !goalAmount && !income && !extraIncome && !expenses) {
@@ -329,8 +335,12 @@ const getPostAnalysisMessage = (input: string) => {
     return 'Listo, ajustamos el monto. Dime el nuevo valor completo, por ejemplo: "la meta ahora vale 4 millones".';
   }
 
+  if (normalized.includes('gano mas') || normalized.includes('gano más') || normalized.includes('extra')) {
+    return 'Súper. ¿Cuánto más ganas al mes? Puedes decirme algo como "2 millones extra" o "gano 800 mil más".';
+  }
+
   if (normalized.includes('gasto') || normalized.includes('ingreso')) {
-    return 'Listo, ajustamos tus datos mensuales. Dime el nuevo valor completo, por ejemplo: "mis gastos son 2.5 millones".';
+    return 'Listo, ajustamos tus datos mensuales. Dime el valor completo, por ejemplo: "gano 6 millones", "tengo 2 millones extra" o "mis gastos son 2.5 millones".';
   }
 
   return 'Claro, lo seguimos revisando. Dime qué quieres ajustar: plazo, monto de la meta o gastos mensuales.';
