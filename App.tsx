@@ -24,7 +24,7 @@ const modeLabels: Record<TutorMode, string> = {
 };
 
 const modePrompts: Record<TutorMode, string> = {
-  solve: 'Listo. Pega el enunciado o escribe la pregunta y te explico el tema, la idea clave, los pasos y un truco de examen.',
+  solve: 'Listo. Pega el enunciado o escribe la pregunta y te explico el tema, la idea clave, los pasos y un consejo para examen.',
   generate: 'Perfecto. Dime tema, cantidad y dificultad. Ej: "5 preguntas de funciones, nivel medio, con solución".',
   practice: 'Vamos a practicar. Dime el tema: álgebra, funciones, geometría, trigonometría, probabilidad, estadística o lectura de gráficas.',
   review: 'Pega el enunciado, tu respuesta y la respuesta correcta si la tienes. Te explico dónde estuvo el error y cómo evitarlo.',
