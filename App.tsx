@@ -184,33 +184,33 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-950">
+    <div className="min-h-screen overflow-x-hidden bg-slate-50 font-sans text-slate-950">
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-5">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-slate-900 text-xl font-black text-white">∑</div>
-            <div>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-xl font-black text-white sm:h-11 sm:w-11">∑</div>
+            <div className="min-w-0">
               <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Matemáticas</p>
-              <h1 className="text-lg font-bold text-slate-950">Admisión UNAL e ICFES Saber 11</h1>
+              <h1 className="text-base font-bold leading-tight text-slate-950 sm:text-lg">Admisión UNAL e ICFES Saber 11</h1>
             </div>
           </div>
         </div>
       </header>
 
       <main>
-        <section className="mx-auto grid max-w-6xl gap-10 px-5 py-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+        <section className="mx-auto grid max-w-6xl gap-8 px-4 py-9 sm:px-5 sm:py-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
           <div>
             <p className="mb-3 text-sm font-bold uppercase tracking-wide text-emerald-700">Repaso guiado para estudiantes</p>
-            <h2 className="max-w-3xl text-4xl font-black leading-tight text-slate-950 md:text-5xl">
+            <h2 className="max-w-3xl text-3xl font-black leading-tight text-slate-950 sm:text-4xl md:text-5xl">
               Matemáticas para entrar con más seguridad al examen.
             </h2>
-            <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-700">
+            <p className="mt-5 max-w-2xl text-base leading-7 text-slate-700 sm:text-lg sm:leading-8">
               Practica preguntas tipo admisión UNAL e ICFES Saber 11, revisa errores y recibe explicaciones paso a paso sin perderte en teoría innecesaria.
             </p>
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-lg">
-            <div className="mb-4 flex items-center justify-between">
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-lg sm:p-5">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <h3 className="text-lg font-bold">Entrenamiento rápido</h3>
               <span className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-800">IA Tutor</span>
             </div>
@@ -220,21 +220,21 @@ const App: React.FC = () => {
                   key={reply.value}
                   type="button"
                   onClick={() => handleUserInput(reply.value)}
-                  className="flex w-full items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-left font-semibold text-slate-800 transition hover:border-emerald-500 hover:bg-white"
+                  className="flex w-full items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm font-semibold text-slate-800 transition hover:border-emerald-500 hover:bg-white sm:text-base"
                 >
-                  {reply.label}
-                  <span className="text-slate-400">→</span>
+                  <span className="min-w-0">{reply.label}</span>
+                  <span className="shrink-0 text-slate-400">→</span>
                 </button>
               ))}
             </div>
           </div>
         </section>
 
-        <section className="mx-auto max-w-6xl px-5 pb-24">
-          <div className="mb-5 flex items-end justify-between gap-4">
+        <section className="mx-auto max-w-6xl px-4 pb-24 sm:px-5">
+          <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-sm font-bold uppercase tracking-wide text-slate-500">Temas frecuentes</p>
-              <h2 className="text-2xl font-black text-slate-950">Repasa lo que más aparece</h2>
+              <h2 className="text-2xl font-black leading-tight text-slate-950">Repasa lo que más aparece</h2>
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -256,7 +256,7 @@ const App: React.FC = () => {
           </div>
         </section>
 
-        <footer className="border-t border-slate-200 bg-white px-5 py-6 text-center text-sm font-medium text-slate-600">
+        <footer className="border-t border-slate-200 bg-white px-4 py-6 text-center text-sm font-medium leading-6 text-slate-600 sm:px-5">
           Todos los derechos reservados - Jhonatan Solano - Matemático de la Universidad Nacional de Colombia.
         </footer>
       </main>
@@ -264,19 +264,19 @@ const App: React.FC = () => {
       <button
         type="button"
         onClick={() => setIsChatOpen(prev => !prev)}
-        className="fixed bottom-5 right-5 z-40 flex h-16 w-16 items-center justify-center rounded-full bg-slate-950 text-3xl font-black text-white shadow-[0_0_0_6px_rgba(16,185,129,0.16),0_18px_35px_rgba(15,23,42,0.30)] transition duration-200 hover:scale-125 hover:bg-emerald-700 hover:shadow-[0_0_0_10px_rgba(16,185,129,0.22),0_22px_45px_rgba(16,185,129,0.35)]"
+        className="fixed bottom-4 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-slate-950 text-2xl font-black text-white shadow-[0_0_0_6px_rgba(16,185,129,0.16),0_18px_35px_rgba(15,23,42,0.30)] transition duration-200 hover:scale-125 hover:bg-emerald-700 hover:shadow-[0_0_0_10px_rgba(16,185,129,0.22),0_22px_45px_rgba(16,185,129,0.35)] sm:bottom-5 sm:right-5 sm:h-16 sm:w-16 sm:text-3xl"
         aria-label="Abrir chat de tutor"
       >
         ∑
       </button>
 
       {isChatOpen && (
-        <section className="fixed bottom-24 right-5 z-40 flex h-[min(680px,calc(100vh-8rem))] w-[calc(100vw-2.5rem)] max-w-md flex-col rounded-lg border border-slate-200 bg-white shadow-2xl">
-          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 font-black text-white">∑</div>
-              <div>
-                <h2 className="font-bold text-slate-950">Tutor de matemáticas</h2>
+        <section className="fixed inset-x-3 bottom-20 z-40 flex h-[min(680px,calc(100dvh-6.5rem))] flex-col rounded-lg border border-slate-200 bg-white shadow-2xl sm:inset-x-auto sm:bottom-24 sm:right-5 sm:w-[min(28rem,calc(100vw-2.5rem))]">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-3 py-3 sm:px-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-900 font-black text-white">∑</div>
+              <div className="min-w-0">
+                <h2 className="truncate font-bold text-slate-950">Tutor de matemáticas</h2>
                 <p className="text-xs text-slate-500">UNAL · ICFES Saber 11</p>
               </div>
             </div>
@@ -290,7 +290,7 @@ const App: React.FC = () => {
             </button>
           </div>
 
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-slate-50 p-4">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-slate-50 p-3 sm:p-4">
             {messages.map(msg => (
               <ChatMessage
                 key={msg.id}
