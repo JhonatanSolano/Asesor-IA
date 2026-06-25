@@ -31,18 +31,21 @@ Estilo:
 - No inventes datos oficiales de ICFES o UNAL si no son necesarios.
 - Si falta información, haz una sola pregunta concreta.
 - Cuando resuelvas matemáticas, muestra procedimiento verificable y evita saltos grandes.
-- En todas las opciones/modos, usa LaTeX simple y legible para expresiones matemáticas: \(x^2 - 4\), \(\frac{3}{5}\), \(\sqrt{16}\), \(f(x)=2x+1\).
-- Para fórmulas largas usa una línea separada con LaTeX entre \[ y \].
+- En todas las opciones/modos, usa LaTeX simple y legible para expresiones matemáticas en formato KaTeX/Markdown: $x^2 - 4$, $\frac{3}{5}$, $\sqrt{16}$, $f(x)=2x+1$.
+- Para fórmulas largas usa bloque con doble dólar:
+  $$
+  \frac{a}{b}=\frac{c}{d}
+  $$
 - Acompaña cada fórmula con explicación en palabras sencillas.
 - Si generas ejercicios, opciones o soluciones, las expresiones matemáticas también deben ir en LaTeX.
 - Escribe variables, razones, ecuaciones, porcentajes, funciones, fracciones y raíces en LaTeX.
 - En pasos algebraicos, usa una fórmula por línea cuando sea necesario. Ejemplo:
-  \[
+  $$
   x = \frac{150000 \cdot 60000}{250000}
-  \]
-- Para dinero o cantidades en texto, puedes escribir "$150.000", pero las operaciones con esas cantidades deben ir en LaTeX.
-- No uses el formato incorrecto [ \frac{a}{b} ]. El formato correcto es \[\frac{a}{b}\].
-- No uses el formato incorrecto $(x)$. El formato correcto es \(x\).
+  $$
+- Para dinero o cantidades en texto, escribe "COP 150.000" en vez de usar el símbolo "$", para no confundirlo con delimitadores de LaTeX.
+- No uses el formato incorrecto [ \frac{a}{b} ]. El formato correcto es $$\frac{a}{b}$$.
+- No uses el formato incorrecto $(x)$. El formato correcto es $x$.
 - Mantén notación consistente y evita errores algebraicos. Verifica mentalmente cada respuesta antes de entregarla.
 
 Modos según currentData.mode:
@@ -87,8 +90,10 @@ Responde directamente en Markdown. No respondas JSON. No uses markdown fences sa
 
 function normalizeLatex(text: string): string {
   return text
-    .replace(/^\s*\[\s*([\\A-Za-z0-9_{}^=+\-*/().,\s]+)\s*\]\s*$/gm, "\\[\n$1\n\\]")
-    .replace(/\$\(([^)]+)\)\$/g, "\\($1\\)")
+    .replace(/\\\[((?:.|\n)*?)\\\]/g, "\n$$$$\n$1\n$$$$\n")
+    .replace(/\\\((.*?)\\\)/g, "$$$1$$")
+    .replace(/^\s*\[\s*([\\A-Za-z0-9_{}^=+\-*/().,\s]+)\s*\]\s*$/gm, "\n$$$$\n$1\n$$$$\n")
+    .replace(/\$\(([^)]+)\)\$/g, "$$$1$$")
     .replace(/\bTruco PREICFES\b/gi, "Consejo para examen")
     .replace(/\bTruco ICFES\b/gi, "Consejo para examen")
     .replace(/\bTruco UNAL\b/gi, "Consejo para examen");

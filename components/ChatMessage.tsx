@@ -1,8 +1,11 @@
 
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
+import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
 import { Message } from '../types';
+import 'katex/dist/katex.min.css';
 
 interface ChatMessageProps {
   message: Message;
@@ -23,7 +26,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, onQuickReply, quickR
       </div>
       <div className={bubbleClasses}>
          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[rehypeKatex]}
             components={{
                 table: ({node, ...props}) => <table className="table-auto w-full bg-white text-black rounded-lg my-2" {...props} />,
                 thead: ({node, ...props}) => <thead className="bg-gray-200" {...props} />,
