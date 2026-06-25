@@ -51,10 +51,23 @@ const parseTimelineInMonths = (timeline?: string) => {
   if (!timeline) return undefined;
 
   const normalized = normalizeText(timeline);
-  const value = parseNumberValue(normalized);
+  if (!/(ano|anos|mes|meses)/.test(normalized)) return undefined;
+
+  const numericMatch = normalized.match(/(\d+(?:[.,]\d+)?)\s*(anos?|mes(?:es)?)/);
+  const unit = numericMatch?.[2] || normalized.match(/\b(anos?|mes(?:es)?)\b/)?.[1];
+  const unitIndex = unit ? normalized.indexOf(unit) : -1;
+  const beforeUnit = unitIndex >= 0 ? normalized.slice(0, unitIndex).split(/\s+/).slice(-5).join(' ') : normalized;
+  let value = numericMatch
+    ? Number(numericMatch[1].replace(',', '.'))
+    : parseNumberValue(beforeUnit);
+
+  if (value && /anos?\s+y\s+medio|anos?\s+y\s+media/.test(normalized)) {
+    value += 0.5;
+  }
+
   if (!value) return undefined;
 
-  if (normalized.includes('año') || normalized.includes('ano')) {
+  if (unit?.startsWith('ano') || normalized.includes('año') || normalized.includes('ano')) {
     return Math.round(value * 12);
   }
 
@@ -131,6 +144,34 @@ const parseNumberValue = (input: string) => {
   return numericValue || parseNumberWords(normalized);
 };
 
+const parseMoneyValueFromText = (input: string) => {
+  const normalized = normalizeText(input).replace(/(\d)(m\b|millones?|palos?)/g, '$1 $2');
+  const hasDigit = /\d/.test(normalized);
+  const hasMoneyUnit = /\b(m|millon|millones|palos?|pesos?)\b/.test(normalized);
+  if (!hasDigit && !hasMoneyUnit) return undefined;
+
+  const value = parseNumberValue(normalized);
+  if (!value) return undefined;
+
+  if (/\b(m|millon|millones|palos?)\b/.test(normalized)) {
+    return Math.round(value * 1000000);
+  }
+
+  return Math.round(value);
+};
+
+const parseMoneyNearKeywords = (input: string, keywords: string[]) => {
+  const normalized = normalizeText(input);
+  const words = normalized.split(/\s+/);
+  const keywordIndex = words.findIndex(word => keywords.some(keyword => word.includes(keyword)));
+
+  if (keywordIndex < 0) return undefined;
+
+  const after = words.slice(keywordIndex, keywordIndex + 9).join(' ');
+  const before = words.slice(Math.max(0, keywordIndex - 4), keywordIndex + 1).join(' ');
+  return parseMoneyValueFromText(after) || parseMoneyValueFromText(before);
+};
+
 const formatTimeline = (months?: number) => {
   if (!months) return 'el nuevo plazo';
   if (months % 12 === 0) return `${months / 12} años`;
@@ -139,23 +180,17 @@ const formatTimeline = (months?: number) => {
 };
 
 const parseMoneyAmount = (input: string) => {
-  const normalized = normalizeText(input);
-  const value = parseNumberValue(normalized);
-  if (!value) return undefined;
-
-  if (/millon|millones|palos/.test(normalized)) {
-    return Math.round(value * 1000000);
-  }
-
-  return Math.round(value);
+  return parseMoneyValueFromText(input);
 };
 
 const parseGoalAmount = (input: string) => {
-  if (!/(monto|vale|cuesta|valor|meta|millon|millones|palos|pesos)/i.test(normalizeText(input))) {
+  const normalized = normalizeText(input);
+  if (!/(monto|vale|cuesta|valor|meta|millon|millones|palos|pesos|carro|moto|viaje)/i.test(normalized)) {
     return undefined;
   }
 
-  return parseMoneyAmount(input);
+  return parseMoneyNearKeywords(input, ['vale', 'cuesta', 'valor', 'monto', 'meta'])
+    || parseMoneyValueFromText(input);
 };
 
 const applyPostAnalysisAdjustment = (
@@ -165,11 +200,13 @@ const applyPostAnalysisAdjustment = (
   const normalized = input.toLowerCase();
   const goalTimelineInMonths = parseTimelineInMonths(input);
   const goalAmount = parseGoalAmount(input);
-  const moneyAmount = parseMoneyAmount(input);
-  const income = /ingreso|gano|salario|mensualidad/.test(normalized) ? moneyAmount : undefined;
-  const expenses = /gasto|gastos|egreso|arriendo|mercado/.test(normalized) ? moneyAmount : undefined;
+  const income = parseMoneyNearKeywords(input, ['ingreso', 'ingresos', 'gano', 'gana', 'salario', 'mensualidad']);
+  const extraIncome = /extra|adicional|mas/.test(normalizeText(input))
+    ? parseMoneyNearKeywords(input, ['extra', 'adicional'])
+    : undefined;
+  const expenses = parseMoneyNearKeywords(input, ['gasto', 'gastos', 'egreso', 'arriendo', 'mercado']);
 
-  if (!goalTimelineInMonths && !goalAmount && !income && !expenses) {
+  if (!goalTimelineInMonths && !goalAmount && !income && !extraIncome && !expenses) {
     return null;
   }
 
@@ -180,7 +217,8 @@ const applyPostAnalysisAdjustment = (
       goalTimeline: formatTimeline(goalTimelineInMonths),
     } : {}),
     ...(goalAmount ? { goalAmount } : {}),
-    ...(income ? { income } : {}),
+    ...(income ? { income: /extra|adicional|mas/.test(normalizeText(input)) && data.income ? data.income + income : income } : {}),
+    ...(extraIncome && !income ? { income: (data.income || 0) + extraIncome } : {}),
     ...(expenses ? { expenses } : {}),
   };
 };
