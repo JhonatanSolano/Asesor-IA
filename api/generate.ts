@@ -11,8 +11,11 @@ type ApiRequest = {
 };
 
 type ApiResponse = {
-  status: (code: number) => ApiResponse;
-  json: (body: unknown) => void;
+  status?: (code: number) => ApiResponse;
+  json?: (body: unknown) => void;
+  setHeader?: (name: string, value: string) => void;
+  end?: (body?: string) => void;
+  statusCode?: number;
 };
 
 type ChatContent = {
@@ -30,6 +33,16 @@ function getModelName(): string {
 
 function getModelCandidates(): string[] {
   return Array.from(new Set([getModelName(), "gemini-2.5-flash-lite", "gemini-flash-lite-latest"]));
+}
+
+function sendJson(res: ApiResponse, statusCode: number, body: unknown) {
+  if (typeof res.status === "function" && typeof res.json === "function") {
+    return res.status(statusCode).json(body);
+  }
+
+  res.statusCode = statusCode;
+  res.setHeader?.("Content-Type", "application/json");
+  return res.end?.(JSON.stringify(body));
 }
 
 function extractJson(text: string): string {
@@ -67,20 +80,20 @@ async function generateWithModel(
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method Not Allowed" });
+    return sendJson(res, 405, { error: "Method Not Allowed" });
   }
 
   const apiKey = getApiKey();
   if (!apiKey) {
     console.error("Missing API_KEY or GEMINI_API_KEY environment variable.");
-    return res.status(500).json({
+    return sendJson(res, 500, {
       error: "Falta configurar la variable de entorno API_KEY o GEMINI_API_KEY en el servidor.",
     });
   }
 
   const { history = [], currentUserInput = "", currentData = {} } = req.body || {};
   if (!currentUserInput.trim()) {
-    return res.status(400).json({ error: "El mensaje del usuario está vacío." });
+    return sendJson(res, 400, { error: "El mensaje del usuario está vacío." });
   }
 
   try {
@@ -102,7 +115,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     for (const modelName of getModelCandidates()) {
       try {
         const parsed = await generateWithModel(apiKey, modelName, contents);
-        return res.status(200).json(parsed);
+        return sendJson(res, 200, parsed);
       } catch (error) {
         lastError = error;
         if (!isRetryableModelError(error)) {
@@ -119,24 +132,24 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const message = error instanceof Error ? error.message : String(error);
 
     if (/API key not valid|API_KEY_INVALID/i.test(message)) {
-      return res.status(401).json({
+      return sendJson(res, 401, {
         error: "La API key de Gemini no es válida. Genera una clave nueva y configúrala como API_KEY o GEMINI_API_KEY.",
       });
     }
 
     if (/not found|not supported|ListModels/i.test(message)) {
-      return res.status(502).json({
+      return sendJson(res, 502, {
         error: `El modelo de Gemini "${getModelName()}" no está disponible. Configura GEMINI_MODEL con un modelo vigente, por ejemplo gemini-2.5-flash.`,
       });
     }
 
     if (/high demand|Service Unavailable|Too Many Requests|quota|429|503/i.test(message)) {
-      return res.status(503).json({
+      return sendJson(res, 503, {
         error: "Gemini está saturado o sin cuota temporalmente. Intenta de nuevo en unos segundos.",
       });
     }
 
-    return res.status(500).json({
+    return sendJson(res, 500, {
       error: "No se pudo generar la respuesta con Gemini. Revisa la API key y los logs del servidor.",
     });
   }
