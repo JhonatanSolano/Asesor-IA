@@ -191,7 +191,7 @@ const App: React.FC = () => {
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-slate-900 text-xl font-black text-white">∑</div>
             <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Prep Matemática</p>
+              <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Matemáticas</p>
               <h1 className="text-lg font-bold text-slate-950">Admisión UNAL e ICFES Saber 11</h1>
             </div>
           </div>
