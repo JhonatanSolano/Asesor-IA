@@ -80,6 +80,14 @@ const getFinalMessage = (analysis: Analysis) => {
 const isClosingThanks = (input: string) =>
   /^(gracias|gracias[,. ]+ya|listo|ok|bueno|entendido|ya entend[ií])\b/i.test(input.trim());
 
+const getPostAnalysisMessage = (input: string) => {
+  if (isClosingThanks(input)) {
+    return '¡Con mucho gusto! Me alegra que te haya servido el análisis. Cuando quieras revisar otra meta, aquí estaré para ayudarte.';
+  }
+
+  return 'Dejé el análisis anterior fijo para que puedas revisarlo con calma. Para cambiar plazo, monto o meta, lo mejor es iniciar un nuevo análisis desde cero.';
+};
+
 const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [userData, setUserData] = useState<UserData>({});
@@ -113,10 +121,10 @@ const App: React.FC = () => {
     };
     setMessages(prev => [...prev, userMessage]);
 
-    if (analysis && isClosingThanks(userInput)) {
+    if (analysis) {
       const botMessage: Message = {
         id: `${Date.now()}-bot`,
-        text: '¡Con mucho gusto! Cuando quieras ajustar el plazo, el monto o revisar otra meta, aquí estoy para ayudarte.',
+        text: getPostAnalysisMessage(userInput),
         sender: 'bot',
       };
       setMessages(prev => [...prev, botMessage]);
@@ -146,6 +154,7 @@ const App: React.FC = () => {
           id: `${Date.now()}-bot`,
           text: botText,
           sender: 'bot',
+          analysis: shouldCloseAnalysis && nextAnalysis ? nextAnalysis : undefined,
         };
         setMessages(prev => [...prev, botMessage]);
 
@@ -184,15 +193,17 @@ const App: React.FC = () => {
       
       <main className="flex-1 bg-white rounded-lg shadow-xl p-4 overflow-y-auto flex flex-col space-y-4">
         {messages.map((msg) => (
-          <ChatMessage key={msg.id} message={msg} />
+          <React.Fragment key={msg.id}>
+            <ChatMessage message={msg} />
+            {msg.analysis && (
+              <div className="bg-gray-50 rounded-lg p-4 shadow-inner">
+                <h3 className="text-xl font-bold text-center mb-2 text-green-700">¡Análisis de tu Meta! 🚀</h3>
+                <SavingsChart analysis={msg.analysis} />
+              </div>
+            )}
+          </React.Fragment>
         ))}
         {isLoading && <Spinner />}
-        {analysis && (
-          <div className="bg-gray-50 rounded-lg p-4 shadow-inner">
-            <h3 className="text-xl font-bold text-center mb-2 text-green-700">¡Análisis de tu Meta! 🚀</h3>
-            <SavingsChart analysis={analysis} />
-          </div>
-        )}
         <div ref={chatEndRef} />
       </main>
 
