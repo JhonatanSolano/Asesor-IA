@@ -14,12 +14,12 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, onQuickReply, quickR
   const isBot = message.sender === 'bot';
 
   const containerClasses = `flex items-start gap-3 ${isBot ? '' : 'flex-row-reverse'}`;
-  const bubbleClasses = `max-w-md rounded-2xl p-4 text-white ${isBot ? 'bg-gradient-to-br from-green-500 to-emerald-600 rounded-bl-none' : 'bg-blue-500 rounded-br-none'}`;
+  const bubbleClasses = `max-w-[85%] rounded-2xl p-4 shadow-sm ${isBot ? 'rounded-bl-none bg-white text-slate-900 border border-slate-200' : 'rounded-br-none bg-emerald-600 text-white'}`;
 
   return (
     <div className={containerClasses}>
-      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-2xl ${isBot ? 'bg-green-200' : 'bg-blue-200'}`}>
-        {isBot ? '🐷' : '😎'}
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg font-black ${isBot ? 'bg-slate-900 text-white' : 'bg-emerald-100 text-emerald-800'}`}>
+        {isBot ? '∑' : 'Tú'}
       </div>
       <div className={bubbleClasses}>
          <ReactMarkdown
@@ -30,6 +30,9 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, onQuickReply, quickR
                 th: ({node, ...props}) => <th className="p-2 text-left font-bold" {...props} />,
                 td: ({node, ...props}) => <td className="p-2 border-t border-gray-200" {...props} />,
                 strong: ({node, ...props}) => <strong className="font-bold" {...props} />,
+                p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
+                ol: ({node, ...props}) => <ol className="ml-5 list-decimal space-y-1" {...props} />,
+                ul: ({node, ...props}) => <ul className="ml-5 list-disc space-y-1" {...props} />,
             }}
          >
             {message.text}
@@ -42,7 +45,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, onQuickReply, quickR
                 type="button"
                 disabled={quickRepliesDisabled}
                 onClick={() => onQuickReply?.(reply.value)}
-                className="rounded-full bg-white/95 px-3 py-2 text-sm font-semibold text-green-700 shadow-sm transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-emerald-500 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {reply.label}
               </button>
