@@ -1,10 +1,7 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { SYSTEM_PROMPT } from "../constants.ts";
-
 type ApiRequest = {
   method?: string;
   body?: {
-    history?: Array<{ role: "user" | "model"; parts: Array<{ text: string }> }>;
+    history?: ChatContent[];
     currentUserInput?: string;
     currentData?: Record<string, unknown>;
   };
@@ -22,6 +19,31 @@ type ChatContent = {
   role: "user" | "model";
   parts: Array<{ text: string }>;
 };
+
+const SYSTEM_PROMPT = `
+Eres "Asesor-IA: Tu Pana Financiero", un chatbot asesor financiero con una personalidad colombiana muy amigable, motivadora e informal. Tu objetivo es ayudar a los usuarios a organizar sus finanzas y establecer metas de ahorro realistas. Nunca das consejos de inversion en acciones, criptomonedas u otros instrumentos de alto riesgo.
+
+Tu flujo de conversacion es estrictamente el siguiente:
+1. Pregunta el nombre del usuario.
+2. Pregunta los ingresos mensuales en pesos colombianos.
+3. Pregunta los gastos mensuales totales en pesos colombianos.
+4. Pregunta el nombre de la meta de ahorro.
+5. Pregunta el monto total de la meta.
+6. Pregunta el plazo para la meta.
+7. Solo cuando tengas todos los datos, haces el analisis final.
+
+Reglas:
+- Pregunta una sola cosa a la vez.
+- Calcula goalTimelineInMonths. Si el usuario dice "1 año", son 12 meses. Si dice "6 meses", son 6 meses.
+- Calcula ahorroMensual = (ingresos - gastos) * 0.20.
+- Calcula ahorroNecesarioMensual = monto de la meta / goalTimelineInMonths.
+- Calcula progresoPorcentaje = (ahorroMensual / ahorroNecesarioMensual) * 100.
+- isViable es true si ahorroMensual > 0 y progresoPorcentaje >= 50%.
+- Genera 3 sugerencias.
+- Siempre responde con JSON puro, sin markdown fences.
+- El JSON debe tener: responseText, action, updatedData y opcionalmente analysis.
+- action debe ser "UPDATE_DATA" o "END".
+`;
 
 function getApiKey(): string | undefined {
   return process.env.API_KEY || process.env.GEMINI_API_KEY;
@@ -51,9 +73,12 @@ function extractJson(text: string): string {
   return fenced ? fenced[1].trim() : trimmed;
 }
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 function isRetryableModelError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return /high demand|Service Unavailable|Too Many Requests|quota|429|503/i.test(message);
+  return /high demand|Service Unavailable|Too Many Requests|quota|429|503/i.test(getErrorMessage(error));
 }
 
 async function generateWithModel(
@@ -61,21 +86,35 @@ async function generateWithModel(
   modelName: string,
   contents: ChatContent[]
 ): Promise<unknown> {
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({
-    model: modelName,
-    systemInstruction: {
-      role: "system",
-      parts: [{ text: SYSTEM_PROMPT }],
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
     },
-    generationConfig: {
-      responseMimeType: "application/json",
-    } as any,
+    body: JSON.stringify({
+      systemInstruction: {
+        parts: [{ text: SYSTEM_PROMPT }],
+      },
+      contents,
+      generationConfig: {
+        responseMimeType: "application/json",
+      },
+    }),
   });
 
-  const result = await model.generateContent({ contents });
-  const responseText = result.response.text();
-  return JSON.parse(extractJson(responseText));
+  const responseText = await response.text();
+  if (!response.ok) {
+    throw new Error(responseText || `Gemini API error ${response.status}`);
+  }
+
+  const data = JSON.parse(responseText);
+  const modelText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!modelText) {
+    throw new Error("Gemini response did not include text content.");
+  }
+
+  return JSON.parse(extractJson(modelText));
 }
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
@@ -100,7 +139,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const prompt = [
       `Datos actuales del usuario: ${JSON.stringify(currentData)}`,
       `Mensaje actual del usuario: ${currentUserInput}`,
-      "Responde únicamente con JSON válido siguiendo el formato indicado en el sistema.",
+      "Responde unicamente con JSON valido siguiendo el formato indicado en el sistema.",
     ].join("\n\n");
 
     const contents: ChatContent[] = [
@@ -129,7 +168,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     throw lastError;
   } catch (error) {
     console.error("Error generating Gemini response:", error);
-    const message = error instanceof Error ? error.message : String(error);
+    const message = getErrorMessage(error);
 
     if (/API key not valid|API_KEY_INVALID/i.test(message)) {
       return sendJson(res, 401, {
