@@ -7,6 +7,15 @@ import Spinner from './components/Spinner';
 
 type TutorMode = 'solve' | 'generate' | 'practice' | 'review' | 'guide';
 
+const CHAT_STATE_KEY = 'asesor-ia-chat-state';
+const CHAT_INACTIVITY_LIMIT_MS = 10 * 60 * 1000;
+
+type SavedChatState = {
+  messages: Message[];
+  activeMode: TutorMode | null;
+  updatedAt: number;
+};
+
 const modeQuickReplies: QuickReply[] = [
   { label: 'Resolver pregunta', value: 'Resolver una pregunta' },
   { label: 'Ejercicios tipo examen', value: 'Generar ejercicios tipo examen' },
@@ -103,23 +112,81 @@ const buildModeContext = (mode: TutorMode | null) => {
   };
 };
 
+const getFreshChatState = (): Pick<SavedChatState, 'messages' | 'activeMode'> => ({
+  messages: [initialBotMessage],
+  activeMode: null,
+});
+
+const isSavedChatState = (value: unknown): value is SavedChatState => {
+  if (!value || typeof value !== 'object') return false;
+
+  const state = value as SavedChatState;
+  return (
+    Array.isArray(state.messages) &&
+    state.messages.length > 0 &&
+    typeof state.updatedAt === 'number'
+  );
+};
+
+const loadSavedChatState = (): Pick<SavedChatState, 'messages' | 'activeMode'> => {
+  if (typeof window === 'undefined') return getFreshChatState();
+
+  try {
+    const rawState = window.localStorage.getItem(CHAT_STATE_KEY);
+    if (!rawState) return getFreshChatState();
+
+    const savedState = JSON.parse(rawState);
+    if (!isSavedChatState(savedState)) {
+      window.localStorage.removeItem(CHAT_STATE_KEY);
+      return getFreshChatState();
+    }
+
+    if (Date.now() - savedState.updatedAt > CHAT_INACTIVITY_LIMIT_MS) {
+      window.localStorage.removeItem(CHAT_STATE_KEY);
+      return getFreshChatState();
+    }
+
+    return {
+      messages: savedState.messages,
+      activeMode: savedState.activeMode,
+    };
+  } catch {
+    window.localStorage.removeItem(CHAT_STATE_KEY);
+    return getFreshChatState();
+  }
+};
+
 const App: React.FC = () => {
-  const [messages, setMessages] = useState<Message[]>([initialBotMessage]);
-  const [activeMode, setActiveMode] = useState<TutorMode | null>(null);
+  const [initialChatState] = useState(() => loadSavedChatState());
+  const [messages, setMessages] = useState<Message[]>(initialChatState.messages);
+  const [activeMode, setActiveMode] = useState<TutorMode | null>(initialChatState.activeMode);
   const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    window.localStorage.removeItem('asesor-ia-chat-state');
-  }, []);
-
-  useEffect(() => {
     if (isChatOpen) {
       chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isChatOpen]);
+
+  useEffect(() => {
+    const savedState: SavedChatState = {
+      messages,
+      activeMode,
+      updatedAt: Date.now(),
+    };
+    window.localStorage.setItem(CHAT_STATE_KEY, JSON.stringify(savedState));
+
+    const timeoutId = window.setTimeout(() => {
+      window.localStorage.removeItem(CHAT_STATE_KEY);
+      setMessages([initialBotMessage]);
+      setActiveMode(null);
+    }, CHAT_INACTIVITY_LIMIT_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [messages, activeMode]);
 
   const addBotMessage = (text: string) => {
     const botMessage: Message = {
@@ -257,7 +324,7 @@ const App: React.FC = () => {
         </section>
 
         <footer className="border-t border-slate-200 bg-white px-4 py-6 text-center text-sm font-medium leading-6 text-slate-600 sm:px-5">
-          Todos los derechos reservados - Jhonatan Solano - Matemático de la Universidad Nacional de Colombia.
+          Todos los derechos reservados. Autor: Jhonatan Solano - Matemático de la Universidad Nacional de Colombia.
         </footer>
       </main>
 

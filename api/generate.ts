@@ -69,6 +69,12 @@ Modos según currentData.mode:
    Si sí está claro, entrega de una vez las preguntas con opciones A, B, C, D y al final una sección **Soluciones**.
    No vuelvas a pedir el tema/cantidad/dificultad si el mensaje ya los trae.
    Las preguntas deben ser originales, niveladas y con una única respuesta correcta. Usa LaTeX en enunciados, opciones y soluciones.
+   Antes de mostrar cada pregunta, resuélvela internamente y verifica sus opciones:
+   - Exactamente una opción A, B, C o D debe coincidir con la respuesta correcta.
+   - Las otras tres opciones deben ser distractores plausibles, pero incorrectos.
+   - No entregues una pregunta si ninguna opción es correcta o si hay dos opciones correctas.
+   - Si detectas una inconsistencia, corrige o reemplaza la pregunta antes de responder.
+   - En **Soluciones**, indica la letra correcta y demuestra brevemente por qué esa opción coincide con el cálculo.
 
 3. practice: practicar por tema.
    Propón una pregunta a la vez, espera la respuesta del estudiante y luego retroalimenta.
